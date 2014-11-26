@@ -97,7 +97,7 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
       case "register"  => ask(actor("registrar"),req).mapTo[ServiceResponse]
       case "status" => ask(actor("miner"),req).mapTo[ServiceResponse]
 
-      case "train"  => ask(actor("miner"),req).mapTo[ServiceResponse]
+      case "train"  => ask(actor("builder"),req).mapTo[ServiceResponse]
       case "track"  => ask(actor("tracker"),req).mapTo[ServiceResponse]
        
       case _ => Future {     
@@ -111,6 +111,8 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
   private def actor(worker:String):ActorRef = {
     
     worker match {
+        
+      case "registrar" => context.actorOf(Props(new RecomRegistrar()))
       // TODO
       case _ => null
       
