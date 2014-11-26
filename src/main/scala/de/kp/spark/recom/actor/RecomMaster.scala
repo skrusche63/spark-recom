@@ -109,11 +109,16 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
   }
   
   private def actor(worker:String):ActorRef = {
+
+    // TODO
     
     worker match {
+  
+      case "indexer" => context.actorOf(Props(new RecomIndexer()))
         
-      case "registrar" => context.actorOf(Props(new RecomRegistrar()))
-      // TODO
+      case "registrar" => context.actorOf(Props(new RecomRegistrar()))        
+      case "tracker" => context.actorOf(Props(new RecomTracker()))
+
       case _ => null
       
     }
