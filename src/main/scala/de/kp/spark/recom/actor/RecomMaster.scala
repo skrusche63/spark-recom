@@ -95,7 +95,7 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
       case "index" => ask(actor("indexer"),req).mapTo[ServiceResponse]
 
       case "register"  => ask(actor("registrar"),req).mapTo[ServiceResponse]
-      case "status" => ask(actor("miner"),req).mapTo[ServiceResponse]
+      case "status" => ask(actor("monitor"),req).mapTo[ServiceResponse]
 
       case "train"  => ask(actor("builder"),req).mapTo[ServiceResponse]
       case "track"  => ask(actor("tracker"),req).mapTo[ServiceResponse]
@@ -113,8 +113,11 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
     // TODO
     
     worker match {
+
+      case "builder" => context.actorOf(Props(new RecomBuilder(sc)))
   
       case "indexer" => context.actorOf(Props(new RecomIndexer()))
+      case "monitor" => context.actorOf(Props(new RecomMonitor()))
         
       case "registrar" => context.actorOf(Props(new RecomRegistrar()))        
       case "tracker" => context.actorOf(Props(new RecomTracker()))

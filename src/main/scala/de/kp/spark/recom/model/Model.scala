@@ -25,8 +25,35 @@ import org.json4s.native.Serialization.{read,write}
 
 import de.kp.spark.core.model._
 
+object Algorithms {
+  
+  val ALS:String = "ALS"
+  /* Association rule based recommendations */
+  val ASR:String = "ASR"
+  /* Context-aware recommendations */
+  val CAR:String = "CAR"
+
+  private def algorithms = List(ALS,ASR,CAR) 
+  def isAlgorithm(algorithm:String):Boolean = algorithms.contains(algorithm)
+  
+}
+
 object Messages extends BaseMessages 
 
 object ResponseStatus extends BaseStatus
 
 object Serializer extends BaseSerializer
+
+object Sources {
+
+  val FILE:String    = "FILE"
+  val ELASTIC:String = "ELASTIC" 
+  val JDBC:String    = "JDBC"    
+  val PIWIK:String   = "PIWIK"  
+    
+  private val sources = List(FILE,ELASTIC,JDBC,PIWIK)
+  
+  def isSource(source:String):Boolean = sources.contains(source)
+  
+}
+
