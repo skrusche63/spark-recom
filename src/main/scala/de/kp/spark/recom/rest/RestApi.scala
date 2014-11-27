@@ -59,6 +59,13 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
 
   private def routes:Route = {
 
+    path("build" / Segment) {subject =>
+	  post {
+	    respondWithStatus(OK) {
+	      ctx => doBuild(ctx,subject)
+	    }
+	  }
+    }  ~ 
     path("get" / Segment) {subject => 
 	  post {
 	    respondWithStatus(OK) {
@@ -94,13 +101,6 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
 	    }
 	  }
     }  ~  
-    path("train" / Segment) {subject =>
-	  post {
-	    respondWithStatus(OK) {
-	      ctx => doTrain(ctx,subject)
-	    }
-	  }
-    }  ~ 
     pathPrefix("web") {
       /*
        * 'web' is the prefix for static public content that is
@@ -130,7 +130,13 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
   private def doTrack[T](ctx:RequestContext,subject:String) = {
   }
 
-  private def doTrain[T](ctx:RequestContext,subject:String) = {
+  /**
+   * 'build' describes the initial step of creating a recommender model;
+   * the subsequent step (not invoked by the REST API) comprises training 
+   * with previously prepared data. Training is initiated through the Akka
+   * remote service that interacts with the user preference service
+   */
+  private def doBuild[T](ctx:RequestContext,subject:String) = {
   }
   
   private def doRequest[T](ctx:RequestContext,service:String,task:String) = {

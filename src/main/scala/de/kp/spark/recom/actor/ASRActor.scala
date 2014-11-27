@@ -17,7 +17,6 @@ package de.kp.spark.recom.actor
 * 
 * If not, see <http://www.gnu.org/licenses/>.
 */
-import java.util.Date
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -25,20 +24,12 @@ import org.apache.spark.rdd.RDD
 import de.kp.spark.core.model._
 import de.kp.spark.recom.model._
 
-class ASRActor extends BaseActor {
- 
-  override def receive = {
-   
-    case _ => {
-      
-      val origin = sender               
-      val msg = Messages.REQUEST_IS_UNKNOWN()          
-          
-      origin ! Serializer.serializeResponse(failure(null,msg))
-      context.stop(self)
-      
-    }
-  
-  }
+/**
+ * ASRActor is responsible for interaction with the Association
+ * Analysis engine to build recommendations from association rules
+ */
+class ASRActor(@transient val sc:SparkContext) extends RecomWorker(sc) {
+
+  // TODO
 
 }

@@ -25,20 +25,8 @@ import org.apache.spark.rdd.RDD
 import de.kp.spark.core.model._
 import de.kp.spark.recom.model._
 
-class CARActor extends BaseActor {
- 
-  override def receive = {
-   
-    case _ => {
-      
-      val origin = sender               
-      val msg = Messages.REQUEST_IS_UNKNOWN()          
-          
-      origin ! Serializer.serializeResponse(failure(null,msg))
-      context.stop(self)
-      
-    }
-  
-  }
+class CARActor(@transient val sc:SparkContext) extends RecomWorker(sc) {
+
+  // TODO
 
 }

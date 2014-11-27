@@ -35,9 +35,7 @@ import scala.concurrent.Future
 
 class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
   
-  val (duration,retries,time) = Configuration.actor   
-      
-  implicit val ec = context.dispatcher
+  val (duration,retries,time) = Configuration.actor         
   implicit val timeout:Timeout = DurationInt(time).second
 
   override val supervisorStrategy = OneForOneStrategy(maxNrOfRetries=retries,withinTimeRange = DurationInt(time).minutes) {
@@ -97,7 +95,9 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
       case "register"  => ask(actor("registrar"),req).mapTo[ServiceResponse]
       case "status" => ask(actor("monitor"),req).mapTo[ServiceResponse]
 
-      case "train"  => ask(actor("builder"),req).mapTo[ServiceResponse]
+      case "build" => ask(actor("builder"),req).mapTo[ServiceResponse]
+      case "train" => ask(actor("trainer"),req).mapTo[ServiceResponse]
+
       case "track"  => ask(actor("tracker"),req).mapTo[ServiceResponse]
        
       case _ => Future {     
@@ -115,6 +115,7 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
     worker match {
 
       case "builder" => context.actorOf(Props(new RecomBuilder(sc)))
+      case "trainer" => context.actorOf(Props(new RecomTrainer(sc)))
   
       case "indexer" => context.actorOf(Props(new RecomIndexer()))
       case "monitor" => context.actorOf(Props(new RecomMonitor()))

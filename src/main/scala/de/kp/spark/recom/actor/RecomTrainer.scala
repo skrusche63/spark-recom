@@ -2,7 +2,7 @@ package de.kp.spark.recom.actor
 /* Copyright (c) 2014 Dr. Krusche & Partner PartG
  * 
  * This file is part of the Spark-Recom project
- * (https://github.com/skrusche63/spark-recom).
+ * (https://github.com/skrusche63/spark-cluster).
  * 
  * Spark-Recom is free software: you can redistribute it and/or modify it under the
  * terms of the GNU General Public License as published by the Free Software
@@ -18,18 +18,22 @@ package de.kp.spark.recom.actor
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+import org.apache.spark.SparkContext
+
 import akka.actor.{ActorRef,Props}
 import akka.pattern.ask
 import akka.util.Timeout
 
 import de.kp.spark.core.model._
+
 import de.kp.spark.recom.model._
+import de.kp.spark.recom.Configuration
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class RecomMonitor extends BaseActor {
-
+class RecomTrainer(@transient val sc:SparkContext) extends BaseActor {
+  
   def receive = {
 
     case req:ServiceRequest => {
@@ -37,20 +41,19 @@ class RecomMonitor extends BaseActor {
       val origin = sender    
       val uid = req.data("uid")
 
-      req.task match {
-       
-        case "status" => {
+      req.task.split(":")(0) match {
+        
+        case "train" => {
           
-          val resp = if (cache.statusExists(req) == false) {           
-            failure(req,Messages.TASK_DOES_NOT_EXIST(uid))           
-          } else {            
-            status(req)
+          val response = validate(req) match {
+            
+            case None => train(req).mapTo[ServiceResponse]            
+            case Some(message) => Future {failure(req,message)}
             
           }
-           
-          origin ! Serializer.serializeResponse(resp)
-          context.stop(self)
-          
+
+          onResponse(req,response,origin)
+         
         }
         
         case _ => {
@@ -77,14 +80,29 @@ class RecomMonitor extends BaseActor {
     }
   
   }
+ 
+  private def actor(req:ServiceRequest):ActorRef = {
 
-  private def status(req:ServiceRequest):ServiceResponse = {
+    req.data("algorithm") match {
+      
+      case Algorithms.ALS => context.actorOf(Props(new ALSActor(sc)))   
+      
+      case Algorithms.ASR => context.actorOf(Props(new ASRActor(sc)))   
+      case Algorithms.CAR => context.actorOf(Props(new CARActor(sc)))   
+
+      case _ => null
+      
+    }
+  
+  }
+ 
+  private def train(req:ServiceRequest):Future[Any] = {
+
+    val (duration,retries,time) = Configuration.actor      
+    implicit val timeout:Timeout = DurationInt(time).second
     
-    val uid = req.data("uid")
-    val data = Map("uid" -> uid)
-                
-    new ServiceResponse(req.service,req.task,data,cache.status(req))	
-
+    ask(actor(req), req)
+    
   }
 
 }

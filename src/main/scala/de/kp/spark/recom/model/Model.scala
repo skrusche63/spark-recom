@@ -38,7 +38,15 @@ object Algorithms {
   
 }
 
-object Messages extends BaseMessages 
+object Messages extends BaseMessages {
+  
+  def MISSING_PARAMETERS(uid:String):String = 
+    String.format("""[UID: %s] Parameters are missing.""", uid)
+
+  def MODEL_BUILDING_STARTED(uid:String) = 
+    String.format("""[UID: %s] Model building started.""", uid)
+  
+}
 
 object ResponseStatus extends BaseStatus
 

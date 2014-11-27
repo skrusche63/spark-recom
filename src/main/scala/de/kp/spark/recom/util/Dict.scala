@@ -1,4 +1,4 @@
-package de.kp.spark.recom.actor
+package de.kp.spark.recom.util
 /* Copyright (c) 2014 Dr. Krusche & Partner PartG
 * 
 * This file is part of the Spark-Recom project
@@ -17,14 +17,38 @@ package de.kp.spark.recom.actor
 * 
 * If not, see <http://www.gnu.org/licenses/>.
 */
-import org.apache.spark.SparkContext
-import org.apache.spark.rdd.RDD
 
-import de.kp.spark.core.model._
-import de.kp.spark.recom.model._
+import scala.collection.mutable.{Buffer,Map}
 
-class ALSActor(@transient val sc:SparkContext) extends RecomWorker(sc) {
+class Dict extends Serializable {
 
-  // TODO
+  /**
+   * Reference to the external data designators is used
+   * to speed up data access
+   */
+  private val terms  = Buffer.empty[String]
+  private val lookup = Map.empty[String,Int]
+  
+  /**
+   * Build a dictionary from a distint sequence of terms 
+   */
+  def build(seq:Seq[String]):Dict = {
+  
+    seq.map(entry => terms += entry)
+    seq.zipWithIndex.map(entry => lookup += entry._1 -> entry._2)
+    
+    this
+    
+  }
+  /**
+   * Retrieve lookup data structure
+   */
+  def getLookup = lookup
+  /**
+   * Retrieve external data structure
+   */
+  def getTerms = terms
+  
+  def size = terms.size
   
 }
