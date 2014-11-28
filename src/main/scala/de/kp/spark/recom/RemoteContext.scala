@@ -1,4 +1,4 @@
-package de.kp.spark.recom.actor
+package de.kp.spark.recom
 /* Copyright (c) 2014 Dr. Krusche & Partner PartG
 * 
 * This file is part of the Spark-Recom project
@@ -17,16 +17,23 @@ package de.kp.spark.recom.actor
 * 
 * If not, see <http://www.gnu.org/licenses/>.
 */
-import org.apache.spark.SparkContext
-import org.apache.spark.rdd.RDD
 
-import de.kp.spark.core.model._
-import de.kp.spark.recom.model._
+import scala.concurrent.Future
+import scala.collection.mutable.HashMap
 
-class ALSActor(@transient val sc:SparkContext) extends RecomWorker(sc) {
-  
-  override def buildUserRating(req:ServiceRequest) {}
+class RemoteContext {
 
-  // TODO
-  
+  val clientPool = HashMap.empty[String,RemoteClient]
+ 
+  def send(service:String,message:String):Future[Any] = {
+   
+    if (clientPool.contains(service) == false) {
+      clientPool += service -> new RemoteClient(service)      
+    }
+   
+    val client = clientPool(service)
+    client.send(message)
+ 
+  }
+
 }

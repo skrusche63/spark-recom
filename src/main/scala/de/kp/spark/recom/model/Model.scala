@@ -52,6 +52,19 @@ object ResponseStatus extends BaseStatus
 
 object Serializer extends BaseSerializer
 
+object Services {
+
+  val ASSOCIATION:String = "association"
+  val CONTEXT:String = "context"    
+    
+  val RATING:String = "rating"    
+  val SERIES:String = "series"
+    
+  private val services = List(ASSOCIATION,CONTEXT,RATING,SERIES)
+  def isService(service:String):Boolean = services.contains(service)
+  
+}
+
 object Sources {
 
   val FILE:String    = "FILE"

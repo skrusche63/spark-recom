@@ -44,27 +44,78 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
   
   def receive = {
     
-    case req:String => {
+    /**
+     * This request is sent by a remote Akka actor and may comprise
+     * either a ServiceRequest or a ServiceResponse
+     */
+    case message:String => {
 	  	    
 	  val origin = sender
-
-	  val deser = Serializer.deserializeRequest(req)
-	  val response = execute(deser)
 	  
-      response.onSuccess {
-        case result => origin ! Serializer.serializeResponse(result)
-      }
-      response.onFailure {
-        case result => origin ! failure(deser,Messages.GENERAL_ERROR(deser.data("uid")))	      
-	  }
+	  try {
+	    
+	    deserializeRequest(message) match {
+	      /*
+           * We try to deserialize the external message as a ServiceRequest;
+           * this is the most frequent use case and will considered first
+           */
+	      case Some(req) => {
+	      
+	        val response = doRequest(req)
+	        /*
+	         * In this case a response must be sent to the sender as a request
+	         * is always answered
+	         */
+            response.onSuccess {
+              case result => origin ! Serializer.serializeResponse(result)
+            }
+            response.onFailure {
+              case result => origin ! failure(req,Messages.GENERAL_ERROR(req.data("uid")))	      
+	        }
+	      
+	      }
+	    
+	      case None => {
+	        /*
+             * Next we try to deserialize the external message as a ServiceResponse;
+             * the message may be sent by the user preference engine or one of the
+             * engine of Predictiveworks.
+             */
+	        deserializeResponse(message) match {
+	          /*
+	           * In this case no response is sent to the sender as this is a 
+	           * notification to a previously invoked data processing task
+	           */
+	          case Some(res) => doResponse(res)
+	          
+	          case None => throw new Exception("Unknown message")
+	          
+	        }
+	      
+	      }
+	  
+	    }
+	  
+	  } catch {
+	    case e:Exception => {
       
+	      val msg = Messages.REQUEST_IS_UNKNOWN()          
+          origin ! Serializer.serializeResponse(failure(null,msg))
+	      
+	    }
+	  
+	  }
+    
     }
     
+    /**
+     * This request is sent by the REST API
+     */
     case req:ServiceRequest => {
 	  	    
 	  val origin = sender
 
-	  val response = execute(req)
+	  val response = doRequest(req)
       response.onSuccess {
         case result => origin ! Serializer.serializeResponse(result)
       }
@@ -85,7 +136,33 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
     
   }
 
-  private def execute(req:ServiceRequest):Future[ServiceResponse] = {
+  private def deserializeRequest(message:String):Option[ServiceRequest] = {
+    
+    try {
+      
+      Some(Serializer.deserializeRequest(message))
+      
+    } catch {
+      case e:Exception => None
+    
+    }
+    
+  }
+  
+  private def deserializeResponse(message:String):Option[ServiceResponse] = {
+    
+    try {
+      
+      Some(Serializer.deserializeResponse(message))
+      
+    } catch {
+      case e:Exception => None
+    
+    }
+    
+  }
+
+  private def doRequest(req:ServiceRequest):Future[ServiceResponse] = {
 	  
     req.task.split(":")(0) match {
 
@@ -105,6 +182,45 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
       }
       
     }
+    
+  }
+  
+  private def doResponse(res:ServiceResponse) {
+    
+    val service = res.service
+    service match {
+
+      case "association" => {
+        /*
+         * The response is sent by the Association Analysis as a notification
+         * to a certain data mining task; in this case no further action has
+         * to be taken
+         */
+      }
+      case "context" => {
+        /*
+         * The response is sent by the Context-Aware analysis engine and 
+         * indicates that the building process of a certain factorization
+         * model has been finished successfully; in this case no further
+         * action has to be taken
+         */
+      } 
+      case "rating" => {
+        /*
+         * The response is sent by the user preference service and indicates
+         * that the computation of an implicit rating has finished; in this
+         * case the training of the recommendation model (ALS) or factorization
+         * model (CAR) has to be initiated
+         */
+        
+        val status = res.status
+        // TODO
+        
+      }
+      case _ => 
+        
+    }
+    
     
   }
   

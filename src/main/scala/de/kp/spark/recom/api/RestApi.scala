@@ -1,4 +1,4 @@
-package de.kp.spark.recom.rest
+package de.kp.spark.recom.api
 /* Copyright (c) 2014 Dr. Krusche & Partner PartG
 * 
 * This file is part of the Spark-Recom project
@@ -51,7 +51,7 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
   override def actorRefFactory:ActorSystem = system
   
   val (duration,retries,time) = Configuration.actor   
-  val master = system.actorOf(Props(new RecomMaster(sc)), name="RecomMaster")
+  val master = system.actorOf(Props(new RecomMaster(sc)), name="recom-master")
  
   def start() {
     RestService.start(routes,system,host,port)

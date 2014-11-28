@@ -1,4 +1,4 @@
-package de.kp.spark.recom.actor
+package de.kp.spark.recom.api
 /* Copyright (c) 2014 Dr. Krusche & Partner PartG
 * 
 * This file is part of the Spark-Recom project
@@ -17,16 +17,17 @@ package de.kp.spark.recom.actor
 * 
 * If not, see <http://www.gnu.org/licenses/>.
 */
+
 import org.apache.spark.SparkContext
-import org.apache.spark.rdd.RDD
+import akka.actor.{ActorSystem,Props}
 
-import de.kp.spark.core.model._
-import de.kp.spark.recom.model._
+import de.kp.spark.recom.actor.RecomMaster
 
-class ALSActor(@transient val sc:SparkContext) extends RecomWorker(sc) {
-  
-  override def buildUserRating(req:ServiceRequest) {}
+class AkkaApi(system:ActorSystem,@transient val sc:SparkContext) {
 
-  // TODO
-  
+  val master = system.actorOf(Props(new RecomMaster(sc)), name="recom-master")
+
+  def start() {
+     while (true) {}   
+  }
 }

@@ -1,4 +1,4 @@
-package de.kp.spark.recom.actor
+package de.kp.spark.recom
 /* Copyright (c) 2014 Dr. Krusche & Partner PartG
 * 
 * This file is part of the Spark-Recom project
@@ -17,16 +17,41 @@ package de.kp.spark.recom.actor
 * 
 * If not, see <http://www.gnu.org/licenses/>.
 */
-import org.apache.spark.SparkContext
-import org.apache.spark.rdd.RDD
 
-import de.kp.spark.core.model._
-import de.kp.spark.recom.model._
+import scala.xml._
 
-class ALSActor(@transient val sc:SparkContext) extends RecomWorker(sc) {
+import scala.io.Source
+import scala.collection.mutable.{ArrayBuffer,HashMap}
+
+import scala.util.control.Breaks._
+
+object Registry {
+
+  private val path = "services.xml"
   
-  override def buildUserRating(req:ServiceRequest) {}
+  private val root:Elem = XML.load(getClass.getClassLoader.getResource(path))
+  
+  private val services = HashMap.empty[String,String]
+  
+  load()
+  
+  private def load() {
 
-  // TODO
+    for (service <- root \ "service") {
+      
+      val name  = (service \ "@name").toString
+      val url = service.text
+      
+      services += name -> url
+      
+    }
+
+  }
+
+  def get(name:String):String = services.get(name).get
+  
+  def main(args:Array[String]) {
+    
+  }
   
 }

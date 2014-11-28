@@ -1,4 +1,4 @@
-package de.kp.spark.recom.actor
+package de.kp.spark.recom
 /* Copyright (c) 2014 Dr. Krusche & Partner PartG
 * 
 * This file is part of the Spark-Recom project
@@ -17,16 +17,33 @@ package de.kp.spark.recom.actor
 * 
 * If not, see <http://www.gnu.org/licenses/>.
 */
-import org.apache.spark.SparkContext
-import org.apache.spark.rdd.RDD
 
-import de.kp.spark.core.model._
-import de.kp.spark.recom.model._
+import akka.actor.ActorSystem
+import com.typesafe.config.ConfigFactory
 
-class ALSActor(@transient val sc:SparkContext) extends RecomWorker(sc) {
+import akka.pattern.ask
+import akka.util.Timeout
+
+import scala.concurrent.duration.Duration._
+import scala.concurrent.duration.DurationInt
+
+import scala.concurrent.Future
+
+class RemoteClient(service:String) {
+
+  private val path = "client.conf"    
+  private val conf = ConfigFactory.load(path)
+
+  private val duration = conf.getConfig(service).getInt("timeout")
+  implicit val timeout = Timeout(DurationInt(duration).second)
   
-  override def buildUserRating(req:ServiceRequest) {}
+  private val url = Registry.get(service)
+    
+  private val system = ActorSystem(service, conf)
+  private val remote = system.actorSelection(url)
 
-  // TODO
-  
+  def send(req:Any):Future[Any] = ask(remote, req)    
+  def shutdown() = system.shutdown
+
 }
+
