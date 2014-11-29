@@ -116,20 +116,6 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
     }
   }
 
-  private def doGet[T](ctx:RequestContext,subject:String) = {
-  }
-
-  private def doIndex[T](ctx:RequestContext,subject:String) = {
-  }
-  
-  private def doRegister[T](ctx:RequestContext,subject:String) = {
-  }
-  
-  private def doStatus[T](ctx:RequestContext) = {}
-  
-  private def doTrack[T](ctx:RequestContext,subject:String) = {
-  }
-
   /**
    * 'build' describes the initial step of creating a recommender model;
    * the subsequent step (not invoked by the REST API) comprises training 
@@ -151,6 +137,105 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
        * data source
        */
       case Topics.ITEM => doRequest(ctx,service,"build:item")
+      
+      case _ => {/* do nothing */}
+      
+    }
+    
+  }
+
+  private def doGet[T](ctx:RequestContext,subject:String) = {
+  }
+
+  /**
+   * 'index' describes an administration request to create an
+   * Elasticsearch index either for events or items; this request
+   * must be performed before tracking of events or items can be
+   * started
+   */
+  private def doIndex[T](ctx:RequestContext,subject:String) = {
+    
+    val service = ""
+      
+    subject match {
+      /* 
+       * Prepare an Elasticsearch index to describe events;
+       * an event specifies a certain user engagemen event
+       * and is used to compute an implicit user rating 
+       * before any ALS or CAR based model building can
+       * be started
+       */
+      case Topics.EVENT => doRequest(ctx,service,"index:event")
+      /* 
+       * Prepare an Elasticsearch index to describe items;
+       * an item is a certain order o purchase item and is 
+       * used to discover association rules or ALS based
+       * model building
+       */
+      case Topics.ITEM => doRequest(ctx,service,"index:item")
+      
+      case _ => {/* do nothing */}
+      
+    }
+  }
+  
+  /**
+   * 'register' describes an administration request to persist
+   * meta data descriptions either for event based or item based
+   * data sources. These metadata descriptions are used to map
+   * internal and external field specifications
+   */
+  private def doRegister[T](ctx:RequestContext,subject:String) = {
+    
+    val service = ""
+      
+    subject match {
+      /* 
+       * Register the metadata specification for an event based
+       * data source; the specification is persisted in a Redis
+       * instance and will be used to adequately access a data
+       * soucre
+       */
+      case Topics.EVENT => doRequest(ctx,service,"register:event")
+      /*
+       * Register the metadata specification for an item based
+       * data source; the specification is persisted in a Redis
+       * instance and will be used to adequately access a data
+       * soucre
+       */
+      case Topics.ITEM => doRequest(ctx,service,"register:item")
+      
+      case _ => {/* do nothing */}
+      
+    }
+  }
+  
+  private def doStatus[T](ctx:RequestContext) = {}
+  
+  /**
+   * 'track' describes a request to register a single 'event' 
+   * or 'item' for later used; the indexing functionality is
+   * done by the recommender and NOT delegated to the respective
+   * service
+   */
+  private def doTrack[T](ctx:RequestContext,subject:String) = {
+    
+    val service = ""
+      
+    subject match {
+      /* 
+       * Track a single event; this event is registered in an 
+       * Elasticsearch index and will be used for preference
+       * building as well as for training factorization models
+       */
+      case Topics.EVENT => doRequest(ctx,service,"track:event")
+      /*
+       * Track a single item; this item is registered in an 
+       * Elasticsearch index and will used for preference
+       * building as well as for data mining (association
+       * rules) and training and ALS model
+       */
+      case Topics.ITEM => doRequest(ctx,service,"track:item")
       
       case _ => {/* do nothing */}
       
