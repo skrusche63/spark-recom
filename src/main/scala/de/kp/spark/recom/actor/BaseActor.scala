@@ -23,12 +23,16 @@ import akka.actor.{Actor,ActorLogging,ActorRef}
 import de.kp.spark.core.model._
 import de.kp.spark.core.redis.RedisCache
 
+import de.kp.spark.recom.Configuration
 import de.kp.spark.recom.model._
+
 import scala.concurrent.Future
 
 abstract class BaseActor extends Actor with ActorLogging {
 
-  val cache = new RedisCache()
+  val (host,port) = Configuration.redis
+  val cache = new RedisCache(host,port.toInt)
+
   implicit val ec = context.dispatcher
   
   protected def failure(req:ServiceRequest,message:String):ServiceResponse = {

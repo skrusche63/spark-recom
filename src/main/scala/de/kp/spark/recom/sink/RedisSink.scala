@@ -21,12 +21,16 @@ package de.kp.spark.recom.sink
 import de.kp.spark.core.model._
 import de.kp.spark.core.redis.RedisClient
 
+import de.kp.spark.recom.Configuration
+
 import java.util.Date
 import scala.collection.JavaConversions._
 
 class RedisSink {
 
-  val client  = RedisClient()
+  val (host,port) = Configuration.redis
+  val client = RedisClient(host,port.toInt)
+
   val service = "recom"
   
   def addModel(req:ServiceRequest,model:String) {

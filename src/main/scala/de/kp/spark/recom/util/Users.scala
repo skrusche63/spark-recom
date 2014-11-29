@@ -21,11 +21,13 @@ package de.kp.spark.recom.util
 import de.kp.spark.core.model._
 import de.kp.spark.core.redis.RedisClient
 
+import de.kp.spark.recom.Configuration
 import scala.collection.JavaConversions._
 
 object Users {
 
-  private val client = RedisClient()
+  val (host,port) = Configuration.redis
+  val client = RedisClient(host,port.toInt)
   
   private def buildFromRedis(req:ServiceRequest):Seq[String] = {
         
