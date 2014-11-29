@@ -36,33 +36,16 @@ class RecomMonitor extends BaseActor {
       
       val origin = sender    
       val uid = req.data("uid")
-
-      req.task match {
-       
-        case "status" => {
           
-          val resp = if (cache.statusExists(req) == false) {           
-            failure(req,Messages.TASK_DOES_NOT_EXIST(uid))           
-          } else {            
-            status(req)
+      val resp = if (cache.statusExists(req) == false) {           
+        failure(req,Messages.TASK_DOES_NOT_EXIST(uid))           
+      } else {            
+        status(req)
             
-          }
-           
-          origin ! Serializer.serializeResponse(resp)
-          context.stop(self)
-          
-        }
-        
-        case _ => {
-          
-          val msg = Messages.TASK_IS_UNKNOWN(uid,req.task)
-          
-          origin ! Serializer.serializeResponse(failure(req,msg))
-          context.stop(self)
-          
-        }
-        
       }
+           
+      origin ! Serializer.serializeResponse(resp)
+      context.stop(self)
       
     }
     

@@ -1,4 +1,4 @@
-package de.kp.spark.recom.actor
+package de.kp.spark.recom.util
 /* Copyright (c) 2014 Dr. Krusche & Partner PartG
 * 
 * This file is part of the Spark-Recom project
@@ -18,32 +18,45 @@ package de.kp.spark.recom.actor
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
-import org.apache.spark.SparkContext
-import org.apache.spark.rdd.RDD
-
 import de.kp.spark.core.model._
-import de.kp.spark.recom.model._
+import de.kp.spark.core.redis.RedisClient
 
-import de.kp.spark.recom.RemoteContext
+import scala.collection.JavaConversions._
 
-class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker(sc) {
-  /**
-   * The user rating is built by delegating the request to the 
-   * remote rating service; this Akka service represents the 
-   * User Preference engine of Predictiveworks.
-   */
-  override def buildUserRating(req:ServiceRequest) {
+object Items {
+
+  private val client = RedisClient()
+  
+  private def buildFromRedis(req:ServiceRequest):Seq[String] = {
+        
+    val k = "items:" + req.data("site")
+    val data = client.zrange(k, 0, -1)
+
+    val users = if (data.size() == 0) {
+      List.empty[String]
+    
+    } else {
       
-    val service = req.service
-    val message = Serializer.serializeRequest(req)
-    /*
-     * Building user rating is a fire-and-forget task
-     * from the recommendation service prespective
+      data.map(record => {
+        /* format = timestamp:item:name */
+        val Array(timestamp,iid,name) = record.split(":")
+        iid
+        
+      }).toList
+      
+    }
+    
+    users
+  
+  }
+  
+  def get(req:ServiceRequest):Dict = {
+    /**
+     * Actually the user database is retrieved from
+     * Redis instance
      */
-    rtx.send(service,message)
+    new Dict().build(buildFromRedis(req))
     
   }
-
-  // TODO
 
 }

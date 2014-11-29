@@ -29,16 +29,8 @@ import de.kp.spark.recom.util.Dict
 
 object HadoopIO {
 
-  def writeRecom(userspec:Dict,itemspec:Dict,matrix:MatrixFactorizationModel,path:String) {
-    
-    /* Write users to Hadoop */
-    val users = userspec.getTerms.mkString(",")
-    writeToHadoop(users, path + "/users")
-
-    /* Write items to Hadoop */
-    val items = itemspec.getTerms.mkString(",")
-    writeToHadoop(items, path + "/items")
-
+  def writeRecom(matrix:MatrixFactorizationModel,path:String) {
+ 
     try {
 
       /* Write MatrixFactorizationModel */      		
@@ -57,15 +49,7 @@ object HadoopIO {
 
   }
   
-  def readRecom(path:String):(Dict,Dict,MatrixFactorizationModel) = {
-    
-    /* Read users from Hadoop */
-    val users = readFromHadoop(path + "/users").split(",").toSeq
-    val userspec = new Dict().build(users)
-
-    /* Read items from Hadoop */
-    val items = readFromHadoop(path + "/items").split(",").toSeq
-    val itemspec = new Dict().build(items)
+  def readRecom(path:String):MatrixFactorizationModel = {
 
     try {
       
@@ -78,7 +62,7 @@ object HadoopIO {
       
       ois.close()
       
-      (userspec,itemspec,matrix)
+      matrix
       
     } catch {
 	  case e:Exception => throw new Exception(e.getMessage())

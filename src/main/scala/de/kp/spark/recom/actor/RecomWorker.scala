@@ -18,7 +18,6 @@ package de.kp.spark.recom.actor
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 

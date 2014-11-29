@@ -24,12 +24,38 @@ import org.apache.spark.rdd.RDD
 import de.kp.spark.core.model._
 import de.kp.spark.recom.model._
 
+import de.kp.spark.recom.RemoteContext
+
 /**
  * ASRActor is responsible for interaction with the Association
  * Analysis engine to build recommendations from association rules
  */
-class ASRActor(@transient val sc:SparkContext) extends RecomWorker(sc) {
+class ASRActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker(sc) {
+  /**
+   * Recommendations based on association rules do not need to
+   * build user preferences first; therefore, the request is
+   * delegated to mining the respective association rules
+   */
+  override def buildUserRating(req:ServiceRequest) {
 
-  // TODO
+    val service = "association"    
+    buildRecommenderModel(new ServiceRequest(service,"train",req.data))
+    
+  }
+  /**
+   * In case of association rule based recommendation models, the 
+   * term 'model' is equivalent to the respective association rules
+   */
+  override def buildRecommenderModel(req:ServiceRequest) {
+      
+    val service = req.service
+    val message = Serializer.serializeRequest(req)
+    /*
+     * Mining association rules is a fire-and-forget task
+     * from the recommendation service prespective
+     */
+    rtx.send(service,message)
+    
+  }
 
 }

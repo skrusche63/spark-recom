@@ -29,10 +29,12 @@ import de.kp.spark.core.model._
 import de.kp.spark.recom.model._
 import de.kp.spark.recom.Configuration
 
+import de.kp.spark.recom.RemoteContext
+
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class RecomBuilder(@transient val sc:SparkContext) extends BaseActor {
+class RecomBuilder(@transient sc:SparkContext,rtx:RemoteContext) extends BaseActor {
   
   def receive = {
 
@@ -40,33 +42,16 @@ class RecomBuilder(@transient val sc:SparkContext) extends BaseActor {
       
       val origin = sender    
       val uid = req.data("uid")
-
-      req.task.split(":")(0) match {
-        
-        case "build" => {
           
-          val response = validate(req) match {
+      val response = validate(req) match {
             
-            case None => build(req).mapTo[ServiceResponse]            
-            case Some(message) => Future {failure(req,message)}
+        case None => build(req).mapTo[ServiceResponse]            
+        case Some(message) => Future {failure(req,message)}
             
-          }
-
-          onResponse(req,response,origin)
-         
-        }
-        
-        case _ => {
-          
-          val msg = Messages.TASK_IS_UNKNOWN(uid,req.task)
-          
-          origin ! Serializer.serializeResponse(failure(req,msg))
-          context.stop(self)
-          
-        }
-        
       }
-      
+
+      onResponse(req,response,origin)
+         
     }
     
     case _ => {
@@ -85,10 +70,10 @@ class RecomBuilder(@transient val sc:SparkContext) extends BaseActor {
 
     req.data("algorithm") match {
       
-      case Algorithms.ALS => context.actorOf(Props(new ALSActor(sc)))   
+      case Algorithms.ALS => context.actorOf(Props(new ALSActor(sc,rtx)))   
       
-      case Algorithms.ASR => context.actorOf(Props(new ASRActor(sc)))   
-      case Algorithms.CAR => context.actorOf(Props(new CARActor(sc)))   
+      case Algorithms.ASR => context.actorOf(Props(new ASRActor(sc,rtx)))   
+      case Algorithms.CAR => context.actorOf(Props(new CARActor(sc,rtx)))   
 
       case _ => null
       

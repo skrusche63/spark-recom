@@ -18,8 +18,6 @@ package de.kp.spark.recom.api
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
-import java.util.Date
-
 import org.apache.spark.SparkContext
 
 import akka.actor.{ActorRef,ActorSystem,Props}
@@ -41,6 +39,8 @@ import de.kp.spark.core.model._
 import de.kp.spark.core.rest.RestService
 
 import de.kp.spark.recom.Configuration
+import de.kp.spark.recom.model._
+
 import de.kp.spark.recom.actor.{RecomMaster}
 
 class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkContext) extends HttpService with Directives {
@@ -137,6 +137,25 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
    * remote service that interacts with the user preference service
    */
   private def doBuild[T](ctx:RequestContext,subject:String) = {
+    
+    val service = "rating"
+      
+    subject match {
+      /* 
+       * Build a recommender model based on an event related
+       * data source
+       */
+      case Topics.EVENT => doRequest(ctx,service,"build:event")
+      /*
+       * Build a recommender model based on an item related
+       * data source
+       */
+      case Topics.ITEM => doRequest(ctx,service,"build:item")
+      
+      case _ => {/* do nothing */}
+      
+    }
+    
   }
   
   private def doRequest[T](ctx:RequestContext,service:String,task:String) = {

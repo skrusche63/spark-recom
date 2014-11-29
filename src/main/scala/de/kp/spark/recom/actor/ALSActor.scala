@@ -23,10 +23,55 @@ import org.apache.spark.rdd.RDD
 import de.kp.spark.core.model._
 import de.kp.spark.recom.model._
 
-class ALSActor(@transient val sc:SparkContext) extends RecomWorker(sc) {
-  
-  override def buildUserRating(req:ServiceRequest) {}
+import de.kp.spark.recom.{Configuration,Recommender,RemoteContext}
 
-  // TODO
+import de.kp.spark.recom.sink.RedisSink
+import de.kp.spark.recom.hadoop.HadoopIO
+
+class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker(sc) {
   
+  private val sink = new RedisSink()
+  
+  /**
+   * The user rating is built by delegating the request to the 
+   * remote rating service; this Akka service represents the 
+   * User Preference engine of Predictiveworks.
+   */
+  override def buildUserRating(req:ServiceRequest) {
+      
+    val service = req.service
+    val message = Serializer.serializeRequest(req)
+    /*
+     * Building user rating is a fire-and-forget task
+     * from the recommendation service prespective
+     */
+    rtx.send(service,message)
+    
+  }
+ 
+  override def buildRecommenderModel(req:ServiceRequest) {
+          
+    cache.addStatus(req,ResponseStatus.TRAINING_STARTED)
+    /*
+     * Build ALS recommendation model based on the request data;
+     * users & items refer to the reference information that is 
+     * used to map a certain user (uid) and item (iid) to the 
+     * Integer representation required by the ALS algorithm
+     */
+    val model = new Recommender(sc).train(req)
+          
+    /* Register model */
+    val now = new java.util.Date()
+    val dir = Configuration.model + "/als-" + now.getTime().toString
+    /*
+     * The ALS model trained is saved on the HDFS file system and
+     * must be load before building any recommendations
+     */
+    HadoopIO.writeRecom(model,dir)
+    
+    sink.addModel(req,dir)          
+    cache.addStatus(req,ResponseStatus.TRAINING_FINISHED)
+
+ }
+ 
 }

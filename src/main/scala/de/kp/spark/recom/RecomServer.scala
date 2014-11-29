@@ -33,7 +33,7 @@ object RecomServer extends SparkService {
     /**
      * REST API 
      */
-    val httpSystem = ActorSystem("http-recommender")
+    val httpSystem = ActorSystem("rest-server")
     sys.addShutdownHook(httpSystem.shutdown)
     
     val (host,port) = Configuration.rest
@@ -46,7 +46,7 @@ object RecomServer extends SparkService {
      */
     val conf:String = "server.conf"
 
-    val akkaSystem = ActorSystem("akka-recommender",ConfigFactory.load(conf))
+    val akkaSystem = ActorSystem("akka-server",ConfigFactory.load(conf))
     sys.addShutdownHook(akkaSystem.shutdown)
     
     new AkkaApi(akkaSystem,sc).start()

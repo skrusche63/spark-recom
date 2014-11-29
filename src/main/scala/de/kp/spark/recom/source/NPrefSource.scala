@@ -1,4 +1,4 @@
-package de.kp.spark.recom.actor
+package de.kp.spark.recom.source
 /* Copyright (c) 2014 Dr. Krusche & Partner PartG
 * 
 * This file is part of the Spark-Recom project
@@ -22,28 +22,12 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 import de.kp.spark.core.model._
-import de.kp.spark.recom.model._
 
-import de.kp.spark.recom.RemoteContext
+class NPrefSource(@transient sc:SparkContext) {
 
-class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker(sc) {
-  /**
-   * The user rating is built by delegating the request to the 
-   * remote rating service; this Akka service represents the 
-   * User Preference engine of Predictiveworks.
-   */
-  override def buildUserRating(req:ServiceRequest) {
-      
-    val service = req.service
-    val message = Serializer.serializeRequest(req)
-    /*
-     * Building user rating is a fire-and-forget task
-     * from the recommendation service prespective
-     */
-    rtx.send(service,message)
-    
+  def get(req:ServiceRequest):RDD[(String,String,Int,Int)] = {
+    // TODO
+    null
+
   }
-
-  // TODO
-
 }

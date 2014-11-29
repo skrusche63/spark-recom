@@ -30,6 +30,8 @@ import de.kp.spark.core.model._
 import de.kp.spark.recom.Configuration
 import de.kp.spark.recom.model._
 
+import de.kp.spark.recom.RemoteContext
+
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.Future
 
@@ -41,6 +43,11 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
   override val supervisorStrategy = OneForOneStrategy(maxNrOfRetries=retries,withinTimeRange = DurationInt(time).minutes) {
     case _ : Exception => SupervisorStrategy.Restart
   }
+  /**
+   * The RemoteContext is used to interact with the User Preference engine
+   * as well as with other engines from Predictiveworks.
+   */
+  private val rtx = new RemoteContext()
   
   def receive = {
     
@@ -214,7 +221,21 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
          */
         
         val status = res.status
-        // TODO
+        if (status == ResponseStatus.BUILDING_FINISHED) {
+
+          /*
+           * Build the task: the task value within the response message
+           * from the rating service is either build:item or build:event
+           */
+          val task = res.task.replace("build","train")
+          /*
+           * The service is actually not set with here, as the respective
+           * value is determined by the actors that process this request
+           */
+          val req = new ServiceRequest(null,task,res.data)
+          ask(actor("trainer"),req)
+          
+        }
         
       }
       case _ => 
@@ -230,8 +251,8 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
     
     worker match {
 
-      case "builder" => context.actorOf(Props(new RecomBuilder(sc)))
-      case "trainer" => context.actorOf(Props(new RecomTrainer(sc)))
+      case "builder" => context.actorOf(Props(new RecomBuilder(sc,rtx)))
+      case "trainer" => context.actorOf(Props(new RecomTrainer(sc,rtx)))
   
       case "indexer" => context.actorOf(Props(new RecomIndexer()))
       case "monitor" => context.actorOf(Props(new RecomMonitor()))

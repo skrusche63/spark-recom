@@ -78,3 +78,13 @@ object Sources {
   
 }
 
+object Topics {
+
+  val EVENT:String = "event" 
+  val ITEM:String  = "item"
+    
+  private val topics = List(EVENT,ITEM)
+  
+  def isTopic(topic:String):Boolean = topics.contains(topic)
+  
+}

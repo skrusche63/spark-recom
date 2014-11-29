@@ -57,6 +57,13 @@ object Configuration {
     cfg.getString("path")   
     
   }
+   
+  def model():String = {
+  
+    val cfg = config.getConfig("model")
+    cfg.getString("path")   
+    
+  }
  
   def mysql():(String,String,String,String) = {
 
