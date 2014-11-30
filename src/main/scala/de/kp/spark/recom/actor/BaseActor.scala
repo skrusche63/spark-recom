@@ -53,16 +53,14 @@ abstract class BaseActor extends Actor with ActorLogging {
     
     response.onSuccess {
       case result => {
-        receiver ! Serializer.serializeResponse(result)
+        receiver ! result
         context.stop(self)
       }
     }
 
     response.onFailure {
       case throwable => {           
-        val resp = failure(request,throwable.toString)
-        receiver ! Serializer.serializeResponse(resp)	                  
-
+        receiver ! failure(request,throwable.toString)	                  
         context.stop(self)
               
       }	  
@@ -86,6 +84,8 @@ abstract class BaseActor extends Actor with ActorLogging {
     }
 
   }
+
+  protected def serialize(resp:ServiceResponse) = Serializer.serializeResponse(resp)
   
   protected def validate(req:ServiceRequest):Option[String] = {
 

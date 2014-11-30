@@ -25,6 +25,13 @@ import org.json4s.native.Serialization.{read,write}
 
 import de.kp.spark.core.model._
 
+case class Preference(
+  site:String,user:String,item:Int,score:Double
+)
+
+case class Preferences(items:List[Preference])
+
+
 object Algorithms {
   
   val ALS:String = "ALS"

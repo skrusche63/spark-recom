@@ -22,8 +22,10 @@ import org.apache.spark.SparkContext
 import org.apache.spark.mllib.recommendation.{ALS,MatrixFactorizationModel,Rating}
 
 import de.kp.spark.core.model._
-import de.kp.spark.recom.hadoop.HadoopIO
 
+import de.kp.spark.recom.model._
+
+import de.kp.spark.recom.hadoop.HadoopIO
 import de.kp.spark.recom.source.NPrefSource
 
 import de.kp.spark.recom.sink.RedisSink
@@ -32,12 +34,68 @@ import de.kp.spark.recom.util.{Dict,Items,Users}
 class RecommenderModel(@transient sc:SparkContext,req:ServiceRequest) {
   
   private val sink = new RedisSink()
+  
   private val model = HadoopIO.readRecom(sink.model(req))
+  private val users = Users.get(req)
+    
+  /**
+   * For a certain (site,user) predict the 'k' highest scored
+   * items
+   */
+  def predict(site:String,user:String,num:Int):List[Preference] = {
+    
+    val uid = users.getLookup(user)
+    
+    val ratings = model.recommendProducts(uid, num)
+    ratings.sortBy(-_.rating).map(x => Preference(site,user,x.product,x.rating)).toList
+    
+  }
 
-  // TODO
+  /**
+   * For a certain (site,user) combination and a list of provided items,
+   * this method predicts the associated ratings or scores.
+   */
+  def predict(site:String,user:String,items:List[Int]):List[Preference] = {
+
+    val uid = users.getLookup(user)
+    val candidates = sc.parallelize(items)
+    
+    val ratings = model.predict(candidates.map((uid, _))).collect
+    ratings.sortBy(-_.rating).map(x => Preference(site,user,x.product,x.rating)).toList
+    
+  }
+  /**
+   * For a combined (user,item) list, this method predicts the associated ratings
+   * or scores
+   */
+  def predict(site:String,users:List[String],items:List[Int]):List[Preference] = {
+    
+    val pairs = users.zip(items).toList
+    predict(site,pairs)
+
+  }
+
+  /**
+   * For a combined (user,item) list, this method predicts the associated ratings
+   * or scores
+   */
+  private def predict(site:String,pairs:List[(String,Int)]):List[Preference] = {
+    
+    val data = sc.parallelize(pairs.map(pair => {
+      
+      val uid = users.getLookup(pair._1)
+      val iid = pair._2
+      
+      (uid,iid)
+      
+    }))
+
+    val ratings = model.predict(data).collect
+    ratings.sortBy(-_.rating).map(x => Preference(site,users.getTerms(x.user),x.product,x.rating)).toList
+    
+  }
   
 }
-
 
 class Recommender(@transient sc:SparkContext) extends Serializable {
 

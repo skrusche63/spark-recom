@@ -143,8 +143,31 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
     }
     
   }
-
+  
+  /**
+   * 'get' describes requests to retrieve predictions or 
+   * recommendations either from event or item based models
+   */
   private def doGet[T](ctx:RequestContext,subject:String) = {
+    
+    val service = ""
+      
+    subject match {
+      /* 
+       * Get recommendations (predictions) from event-based
+       * recommender models
+       */
+      case Topics.EVENT => doRequest(ctx,service,"get:event")
+      /* 
+       * Get recommendations (predictions) from item-based
+       * recommender models
+       */
+      case Topics.ITEM => doRequest(ctx,service,"get:item")
+      
+      case _ => {/* do nothing */}
+      
+    }
+    
   }
 
   /**

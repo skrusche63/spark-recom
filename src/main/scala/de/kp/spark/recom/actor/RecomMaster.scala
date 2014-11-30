@@ -74,10 +74,10 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
 	         * is always answered
 	         */
             response.onSuccess {
-              case result => origin ! Serializer.serializeResponse(result)
+              case result => origin ! serialize(result)
             }
             response.onFailure {
-              case result => origin ! failure(req,Messages.GENERAL_ERROR(req.data("uid")))	      
+              case result => origin ! serialize(failure(req,Messages.GENERAL_ERROR(req.data("uid"))))	      
 	        }
 	      
 	      }
@@ -124,7 +124,7 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
 
 	  val response = doRequest(req)
       response.onSuccess {
-        case result => origin ! Serializer.serializeResponse(result)
+        case result => origin ! result
       }
       response.onFailure {
         case result => origin ! failure(req,Messages.GENERAL_ERROR(req.data("uid")))	      
@@ -133,11 +133,9 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
     }
   
     case _ => {
-
-      val origin = sender               
+ 
       val msg = Messages.REQUEST_IS_UNKNOWN()          
-          
-      origin ! Serializer.serializeResponse(failure(null,msg))
+      log.error(msg)
 
     }
     
@@ -246,8 +244,6 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
   }
   
   private def actor(worker:String):ActorRef = {
-
-    // TODO
     
     worker match {
 
@@ -255,6 +251,8 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
       case "trainer" => context.actorOf(Props(new RecomTrainer(sc,rtx)))
   
       case "indexer" => context.actorOf(Props(new RecomIndexer()))
+
+      case "questor" => context.actorOf(Props(new RecomQuestor(sc,rtx)))
       case "monitor" => context.actorOf(Props(new RecomMonitor()))
         
       case "registrar" => context.actorOf(Props(new RecomRegistrar()))        

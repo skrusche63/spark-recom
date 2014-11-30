@@ -32,6 +32,27 @@ class RecomWorker(@transient sc:SparkContext) extends BaseActor {
       
       val uid = req.data("uid")
       req. task.split(":")(0) match {
+        
+        case "get" => {
+
+          val missing = missingBuildParams(req)
+          sender ! response(req, missing)
+
+          if (missing == false) {
+
+            cache.addStatus(req,ResponseStatus.BUILDING_STARTED)
+            try {
+              buildUserRating(req)
+              
+            } catch {
+              case e:Exception => cache.addStatus(req,ResponseStatus.FAILURE)          
+            }
+          
+          }
+      
+          context.stop(self)
+          
+        }
       
         /*
          * This request builds implicit user ratings using the
@@ -112,6 +133,8 @@ class RecomWorker(@transient sc:SparkContext) extends BaseActor {
    * this basic recommendation worker
    */
   protected def missingBuildParams(req:ServiceRequest):Boolean = false
+
+  protected def missingGetParams(req:ServiceRequest):Boolean = false
 
   protected def missingTrainParams(req:ServiceRequest):Boolean = false
   

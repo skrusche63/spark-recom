@@ -59,7 +59,7 @@ class RecomTrainer(@transient sc:SparkContext,rtx:RemoteContext) extends BaseAct
       val origin = sender               
       val msg = Messages.REQUEST_IS_UNKNOWN()          
           
-      origin ! Serializer.serializeResponse(failure(null,msg))
+      origin ! failure(null,msg)
       context.stop(self)
 
     }
