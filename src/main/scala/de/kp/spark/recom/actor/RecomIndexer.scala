@@ -19,10 +19,11 @@ package de.kp.spark.recom.actor
  */
 
 import de.kp.spark.core.model._
+import de.kp.spark.core.elastic.{ElasticBuilderFactory => EBF}
+
 import de.kp.spark.core.io.ElasticIndexer
 
 import de.kp.spark.recom.model._
-import de.kp.spark.recom.io.{ElasticBuilderFactory => EBF}
 
 class RecomIndexer extends BaseActor {
   
