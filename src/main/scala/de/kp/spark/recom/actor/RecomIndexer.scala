@@ -18,73 +18,7 @@ package de.kp.spark.recom.actor
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-import de.kp.spark.core.model._
-import de.kp.spark.core.elastic.{ElasticBuilderFactory => EBF}
+import de.kp.spark.core.actor.BaseIndexer
+import de.kp.spark.recom.Configuration
 
-import de.kp.spark.core.io.ElasticIndexer
-
-import de.kp.spark.recom.model._
-
-class RecomIndexer extends BaseActor {
-  
-  def receive = {
-    
-    case req:ServiceRequest => {
-
-      val uid = req.data("uid")
-      val origin = sender
-
-      try {
-
-        val index   = req.data("index")
-        val mapping = req.data("type")
-    
-        val topic = req.task.split(":")(1) match {
-          
-          case "event" => "event"
-          
-          case "item" => "item"
-          
-          case _ => {
-            
-            val msg = Messages.TASK_IS_UNKNOWN(uid,req.task)
-            throw new Exception(msg)
-            
-          }
-        
-        }
-        
-        val builder = EBF.getBuilder(topic,mapping)
-        val indexer = new ElasticIndexer()
-    
-        indexer.create(index,mapping,builder)
-        indexer.close()
-      
-        val data = Map("uid" -> uid, "message" -> Messages.SEARCH_INDEX_CREATED(uid))
-        val response = new ServiceResponse(req.service,req.task,data,ResponseStatus.SUCCESS)	
-      
-        origin ! response
-      
-      } catch {
-        
-        case e:Exception => {
-          
-          log.error(e, e.getMessage())
-      
-          val data = Map("uid" -> uid, "message" -> e.getMessage())
-          val response = new ServiceResponse(req.service,req.task,data,ResponseStatus.FAILURE)	
-      
-          origin ! response
-          
-        }
-      
-      } finally {
-        
-        context.stop(self)
-
-      }
-    }
-    
-  }
-
-}
+class RecomIndexer extends BaseIndexer(Configuration)
