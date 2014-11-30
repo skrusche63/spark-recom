@@ -18,56 +18,7 @@ package de.kp.spark.recom.actor
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-import akka.actor.{ActorRef,Props}
-import akka.pattern.ask
-import akka.util.Timeout
+import de.kp.spark.core.actor.StatusMonitor
+import de.kp.spark.recom.Configuration
 
-import de.kp.spark.core.model._
-import de.kp.spark.recom.model._
-
-import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
-
-class RecomMonitor extends BaseActor {
-
-  def receive = {
-
-    case req:ServiceRequest => {
-      
-      val origin = sender    
-      val uid = req.data("uid")
-          
-      val resp = if (cache.statusExists(req) == false) {           
-        failure(req,Messages.TASK_DOES_NOT_EXIST(uid))           
-      } else {            
-        status(req)
-            
-      }
-           
-      origin ! resp
-      context.stop(self)
-      
-    }
-    
-    case _ => {
-      
-      val origin = sender               
-      val msg = Messages.REQUEST_IS_UNKNOWN()          
-          
-      origin ! failure(null,msg)
-      context.stop(self)
-
-    }
-  
-  }
-
-  private def status(req:ServiceRequest):ServiceResponse = {
-    
-    val uid = req.data("uid")
-    val data = Map("uid" -> uid)
-                
-    new ServiceResponse(req.service,req.task,data,cache.status(req))	
-
-  }
-
-}
+class RecomMonitor extends StatusMonitor(Configuration)
