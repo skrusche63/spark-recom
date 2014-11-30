@@ -19,21 +19,9 @@ package de.kp.spark.recom.io
 */
 
 import org.elasticsearch.common.xcontent.XContentBuilder
-import de.kp.spark.core.elastic.ElasticItemBuilder
+import de.kp.spark.core.elastic.{ElasticEventBuilder,ElasticItemBuilder}
 
 object ElasticBuilderFactory {
-  /*
-   * Definition of common parameters for all indexing tasks
-   */
-  val TIMESTAMP_FIELD:String = "timestamp"
-
-  val SITE_FIELD:String = "site"
-  val USER_FIELD:String = "user"
-
-  val GROUP_FIELD:String = "group"
-  val ITEM_FIELD:String  = "item"
-
-  val EVENT_FIELD:String = "event"
 
   def getBuilder(builder:String,mapping:String):XContentBuilder = {
     
