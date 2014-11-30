@@ -25,6 +25,7 @@ import de.kp.spark.core.model._
 import de.kp.spark.recom.model._
 
 import de.kp.spark.recom.RemoteContext
+import scala.concurrent.Future
 
 class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker(sc) {
   /**
@@ -32,7 +33,7 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
    * remote rating service; this Akka service represents the 
    * User Preference engine of Predictiveworks.
    */
-  override def buildUserRating(req:ServiceRequest) {
+  def doBuildRequest(req:ServiceRequest) {
       
     val service = req.service
     val message = Serializer.serializeRequest(req)
@@ -47,7 +48,7 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
    * In the training of a factorization model is delegated
    * to the context-aware analysis engine
    */
-  override def buildRecommenderModel(req:ServiceRequest) {
+  def doTrainRequest(req:ServiceRequest) {
       
     val service = "context"
     val message = Serializer.serializeRequest(new ServiceRequest(service,"train",req.data))
@@ -59,4 +60,8 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
     
   }
 
+  def doGetRequest(req:ServiceRequest):Future[Any] = null
+
+  def buildGetResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = null
+ 
 }

@@ -24,30 +24,40 @@ import org.apache.spark.rdd.RDD
 import de.kp.spark.core.model._
 import de.kp.spark.recom.model._
 
-class RecomWorker(@transient sc:SparkContext) extends BaseActor {
+import scala.concurrent.Future
+
+abstract class RecomWorker(@transient sc:SparkContext) extends BaseActor {
  
   override def receive = {
 
     case req:ServiceRequest => {
+      
+      val origin = sender 
       
       val uid = req.data("uid")
       req. task.split(":")(0) match {
         
         case "get" => {
 
-          val missing = missingBuildParams(req)
+          val missing = missingGetParams(req)
           sender ! response(req, missing)
 
           if (missing == false) {
 
-            cache.addStatus(req,ResponseStatus.BUILDING_STARTED)
-            try {
-              buildUserRating(req)
-              
-            } catch {
-              case e:Exception => cache.addStatus(req,ResponseStatus.FAILURE)          
+            val response = doGetRequest(req).mapTo[String]
+            response.onSuccess {
+        
+              case result => {
+                val intermediate = Serializer.deserializeResponse(result)
+                origin ! buildGetResponse(req,intermediate)
+        
+              }
+
             }
-          
+            response.onFailure {
+              case throwable => origin ! failure(req,throwable.getMessage)	 	      
+	        }
+         
           }
       
           context.stop(self)
@@ -68,7 +78,7 @@ class RecomWorker(@transient sc:SparkContext) extends BaseActor {
 
             cache.addStatus(req,ResponseStatus.BUILDING_STARTED)
             try {
-              buildUserRating(req)
+              doBuildRequest(req)
               
             } catch {
               case e:Exception => cache.addStatus(req,ResponseStatus.FAILURE)          
@@ -91,7 +101,7 @@ class RecomWorker(@transient sc:SparkContext) extends BaseActor {
  
             cache.addStatus(req,ResponseStatus.TRAINING_STARTED)
             try {
-              buildRecommenderModel(req)
+              doTrainRequest(req)
               
             } catch {
               case e:Exception => cache.addStatus(req,ResponseStatus.FAILURE)          
@@ -127,19 +137,26 @@ class RecomWorker(@transient sc:SparkContext) extends BaseActor {
     }
   
   }
-
   /**
-   * The method below must be addapted by the actors derived from
-   * this basic recommendation worker
+   * Methods to support BUILD requests
    */
   protected def missingBuildParams(req:ServiceRequest):Boolean = false
+  
+  protected def doBuildRequest(req:ServiceRequest)
 
+  /**
+   * Methods to support GET requests
+   */
   protected def missingGetParams(req:ServiceRequest):Boolean = false
 
-  protected def missingTrainParams(req:ServiceRequest):Boolean = false
-  
-  protected def buildUserRating(req:ServiceRequest) {}
+  protected def doGetRequest(req:ServiceRequest):Future[Any]
 
-  protected def buildRecommenderModel(req:ServiceRequest) {}
+  protected def buildGetResponse(request:ServiceRequest,intermediate:ServiceResponse):Any
+  /**
+   * Methods to support TRAIN requests
+   */
+  protected def missingTrainParams(req:ServiceRequest):Boolean = false
+
+  protected def doTrainRequest(req:ServiceRequest)
 
 }

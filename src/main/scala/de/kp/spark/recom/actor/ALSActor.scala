@@ -28,6 +28,8 @@ import de.kp.spark.recom.{Configuration,Recommender,RemoteContext}
 import de.kp.spark.recom.sink.RedisSink
 import de.kp.spark.recom.hadoop.HadoopIO
 
+import scala.concurrent.Future
+
 class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker(sc) {
   
   private val sink = new RedisSink()
@@ -37,7 +39,7 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
    * remote rating service; this Akka service represents the 
    * User Preference engine of Predictiveworks.
    */
-  override def buildUserRating(req:ServiceRequest) {
+  def doBuildRequest(req:ServiceRequest) {
       
     val service = req.service
     val message = Serializer.serializeRequest(req)
@@ -49,7 +51,7 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
     
   }
  
-  override def buildRecommenderModel(req:ServiceRequest) {
+  def doTrainRequest(req:ServiceRequest) {
           
     cache.addStatus(req,ResponseStatus.TRAINING_STARTED)
     /*
@@ -73,5 +75,9 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
     cache.addStatus(req,ResponseStatus.TRAINING_FINISHED)
 
  }
- 
+
+  def doGetRequest(req:ServiceRequest):Future[Any] = null
+
+  def buildGetResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = null
+  
 }

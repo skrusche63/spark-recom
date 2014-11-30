@@ -25,6 +25,7 @@ import de.kp.spark.core.model._
 import de.kp.spark.recom.model._
 
 import de.kp.spark.recom.RemoteContext
+import scala.concurrent.Future
 
 /**
  * ASRActor is responsible for interaction with the Association
@@ -36,17 +37,17 @@ class ASRActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
    * build user preferences first; therefore, the request is
    * delegated to mining the respective association rules
    */
-  override def buildUserRating(req:ServiceRequest) {
+  def doBuildRequest(req:ServiceRequest) {
 
     val service = "association"    
-    buildRecommenderModel(new ServiceRequest(service,"train",req.data))
+    doTrainRequest(new ServiceRequest(service,"train",req.data))
     
   }
   /**
    * In case of association rule based recommendation models, the 
    * term 'model' is equivalent to the respective association rules
    */
-  override def buildRecommenderModel(req:ServiceRequest) {
+  def doTrainRequest(req:ServiceRequest) {
       
     val service = req.service
     val message = Serializer.serializeRequest(req)
@@ -57,5 +58,16 @@ class ASRActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
     rtx.send(service,message)
     
   }
+  
+  def doGetRequest(req:ServiceRequest):Future[Any] = {
 
+    val service = "association"
+    val message = Serializer.serializeRequest(new ServiceRequest(service,"get:recommendation",req.data))
+    
+    rtx.send(service,message)
+    
+  }
+
+  override def buildGetResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = null
+  
 }
