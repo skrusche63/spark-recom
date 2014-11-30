@@ -17,8 +17,10 @@ package de.kp.spark.recom.io
 * 
 * If not, see <http://www.gnu.org/licenses/>.
 */
+
 import org.elasticsearch.common.xcontent.XContentBuilder
-  
+import de.kp.spark.core.elastic.ElasticItemBuilder
+
 object ElasticBuilderFactory {
   /*
    * Definition of common parameters for all indexing tasks

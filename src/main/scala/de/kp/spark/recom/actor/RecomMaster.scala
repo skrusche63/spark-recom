@@ -232,7 +232,7 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
            * The service is actually not set with here, as the respective
            * value is determined by the actors that process this request
            */
-          val req = new ServiceRequest(null,task,res.data)
+          val req = new ServiceRequest("",task,res.data)
           ask(actor("trainer"),req)
           
         }

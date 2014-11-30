@@ -43,7 +43,20 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
     rtx.send(service,message)
     
   }
-
-  // TODO
+  /**
+   * In the training of a factorization model is delegated
+   * to the context-aware analysis engine
+   */
+  override def buildRecommenderModel(req:ServiceRequest) {
+      
+    val service = "context"
+    val message = Serializer.serializeRequest(new ServiceRequest(service,"train",req.data))
+    /*
+     * Training a factorization model is a fire-and-forget task
+     * from the recommendation service prespective
+     */
+    rtx.send(service,message)
+    
+  }
 
 }

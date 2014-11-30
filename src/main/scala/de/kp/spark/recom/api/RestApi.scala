@@ -209,8 +209,18 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
       
     }
   }
+  /**
+   * 'status' is an administration request to determine whether
+   * a certain data mining or knowledge building task has been
+   * finished or not; the only parameter required for status
+   * requests is the unique identifier of a certain task
+   */
+  private def doStatus[T](ctx:RequestContext) = {
+    
+    val service = ""
+    doRequest(ctx,service,"status")
   
-  private def doStatus[T](ctx:RequestContext) = {}
+  }
   
   /**
    * 'track' describes a request to register a single 'event' 
