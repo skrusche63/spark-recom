@@ -64,8 +64,20 @@ class ASRActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
     rtx.send(service,message)
     
   }
+  /**
+   * Prediction requests are not supported for association rules
+   */
+  def doPredictRequest(req:ServiceRequest):Future[Any] = {
+    throw new Exception("Predictions are not suported for the ASR algorithm.")
+  }
   
-  def doGetRequest(req:ServiceRequest):Future[Any] = {
+  def buildPredictResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = null
+
+  /**
+   * A recommendation request is dedicated to a certain 'site' and a list of users, 
+   * and the result is a list of rules assigned to this input
+   */
+  def doRecommendRequest(req:ServiceRequest):Future[Any] = {
 
     val service = "association"
     val message = Serializer.serializeRequest(new ServiceRequest(service,"get:recommendation",req.data))
@@ -74,11 +86,7 @@ class ASRActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
     
   }
 
-  /**
-   * A recommendation request is dedicated to a certain 'site' and a list of users, 
-   * and the result is a list of rules assigned to this input
-   */
-  override def buildGetResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = {
+  def buildRecommendResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = {
     
     if (intermediate.status == ResponseStatus.SUCCESS) {
     

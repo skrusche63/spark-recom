@@ -43,12 +43,12 @@ class RecommenderModel(@transient sc:SparkContext,req:ServiceRequest) {
    * For a certain (site,user) predict the 'k' highest scored
    * items
    */
-  def predict(site:String,user:String,total:Int):List[Preference] = {
+  def predict(site:String,user:String,item:Int):List[Preference] = {
     
     val uid = users.getLookup(user)
     
-    val ratings = model.recommendProducts(uid, total)
-    ratings.sortBy(-_.rating).map(x => Preference(site,user,x.product,x.rating)).toList
+    val rating = model.predict(uid, item)
+    List(Preference(site,user,item,rating))
     
   }
 
@@ -95,6 +95,28 @@ class RecommenderModel(@transient sc:SparkContext,req:ServiceRequest) {
     ratings.sortBy(-_.rating).map(x => Preference(site,users.getTerms(x.user),x.product,x.rating)).toList
     
   }
+  
+  /**
+   * Recommends items to a user. The number returned may be less than the total.
+   */
+  def recommend(site:String,user:String,total:Int):List[Preference] = {
+    
+    val uid = users.getLookup(user)
+    
+    val ratings = model.recommendProducts(uid, total)
+    ratings.sortBy(-_.rating).map(x => Preference(site,user,x.product,x.rating)).toList
+    
+  }
+
+  /**
+   * Recommends users to a product. That is, this returns users who are most likely 
+   * to be interested in a product.
+   */  
+  def recommend(site:String,item:Int,total:Int):List[Preference] = {
+    val ratings = model.recommendProducts(item, total)
+    ratings.sortBy(-_.rating).map(x => Preference(site,users.getTerms(x.user),x.product,x.rating)).toList
+  }
+  
   /**
    * The private method retrieves an ALS model either from the 
    * ALSCache or from the Hadoop file system

@@ -171,8 +171,10 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
 	  
     req.task.split(":")(0) match {
 
-      case "get" => ask(actor("questor"),req).mapTo[ServiceResponse]
       case "index" => ask(actor("indexer"),req).mapTo[ServiceResponse]
+
+      case "predict" => ask(actor("predictor"),req).mapTo[ServiceResponse]
+      case "recommend" => ask(actor("recommender"),req).mapTo[ServiceResponse]
 
       case "register"  => ask(actor("registrar"),req).mapTo[ServiceResponse]
       case "status" => ask(actor("monitor"),req).mapTo[ServiceResponse]
@@ -251,9 +253,10 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
       case "trainer" => context.actorOf(Props(new RecomTrainer(sc,rtx)))
   
       case "indexer" => context.actorOf(Props(new RecomIndexer()))
-
-      case "questor" => context.actorOf(Props(new RecomQuestor(sc,rtx)))
       case "monitor" => context.actorOf(Props(new RecomMonitor()))
+
+      case "predictor" => context.actorOf(Props(new RecomPredictor(sc,rtx)))
+      case "recommender" => context.actorOf(Props(new RecomRecommender(sc,rtx)))
         
       case "registrar" => context.actorOf(Props(new RecomRegistrar()))        
       case "tracker" => context.actorOf(Props(new RecomTracker()))

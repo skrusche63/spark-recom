@@ -33,97 +33,123 @@ abstract class RecomWorker(@transient sc:SparkContext) extends BaseActor {
     case req:ServiceRequest => {
       
       val origin = sender 
+      try {
       
-      val uid = req.data("uid")
-      req. task.split(":")(0) match {
+        val uid = req.data("uid")
+        req. task.split(":")(0) match {
         
-        case "get" => {
+          case "predict" => {
 
-          val missing = missingGetParams(req)
-          sender ! response(req, missing)
+            val missing = missingPredictParams(req)
+            sender ! response(req, missing)
 
-          if (missing == false) {
+            if (missing == false) {
 
-            val response = doGetRequest(req).mapTo[String]
-            response.onSuccess {
+              val response = doPredictRequest(req).mapTo[String]
+              response.onSuccess {
         
-              case result => {
-                val intermediate = Serializer.deserializeResponse(result)
-                origin ! buildGetResponse(req,intermediate)
+                case result => {
+                  val intermediate = Serializer.deserializeResponse(result)
+                  origin ! buildPredictResponse(req,intermediate)
         
+                }
+
               }
-
-            }
-            response.onFailure {
-              case throwable => origin ! failure(req,throwable.getMessage)	 	      
-	        }
+              response.onFailure {
+                case throwable => origin ! failure(req,throwable.getMessage)	 	      
+	          }
          
-          }
-      
-          context.stop(self)
-          
-        }
-      
-        /*
-         * This request builds implicit user ratings using the
-         * remote Akka user preference engine; it is the first
-         * step of generating a certain recommender model
-         */
-        case "build" => {
-
-          val missing = missingBuildParams(req)
-          sender ! response(req, missing)
-
-          if (missing == false) {
-
-            cache.addStatus(req,ResponseStatus.BUILDING_STARTED)
-            try {
-              doBuildRequest(req)
-              
-            } catch {
-              case e:Exception => cache.addStatus(req,ResponseStatus.FAILURE)          
             }
+      
+            context.stop(self)
           
           }
-      
-          context.stop(self)
-          
-        }
         
-        /*
-         * This request trains a certain recommender model; it is the
-         * second step of generating a certain recommender model
-         */
-        case "train" => {
+          case "recommend" => {
 
-          val missing = missingTrainParams(req)
-          if (missing == false) {
- 
-            cache.addStatus(req,ResponseStatus.TRAINING_STARTED)
-            try {
-              doTrainRequest(req)
-              
-            } catch {
-              case e:Exception => cache.addStatus(req,ResponseStatus.FAILURE)          
+            val missing = missingRecommendParams(req)
+            sender ! response(req, missing)
+
+            if (missing == false) {
+
+              val response = doRecommendRequest(req).mapTo[String]
+              response.onSuccess {
+        
+                case result => {
+                  val intermediate = Serializer.deserializeResponse(result)
+                  origin ! buildRecommendResponse(req,intermediate)
+                }
+
+              }
+              response.onFailure {
+                case throwable => origin ! failure(req,throwable.getMessage)	 	      
+	          }
+         
             }
+      
+            context.stop(self)
           
           }
       
-          context.stop(self)
+          /*
+           * This request builds implicit user ratings using the
+           * remote Akka user preference engine; it is the first
+           * step of generating a certain recommender model
+           */
+          case "build" => {
+
+            val missing = missingBuildParams(req)
+            sender ! response(req, missing)
+
+            if (missing == false) {
+
+              cache.addStatus(req,ResponseStatus.BUILDING_STARTED)
+              doBuildRequest(req)
           
-        }
-         
-        case _ => {
-           
-          val msg = Messages.TASK_IS_UNKNOWN(uid,req.task)
-          
-          sender ! Serializer.serializeResponse(failure(req,msg))
-          context.stop(self)
-          
-        }
-          
-      }
+            }
       
+            context.stop(self)
+          
+          }
+        
+          /*
+           * This request trains a certain recommender model; it is the
+           * second step of generating a certain recommender model
+           */
+          case "train" => {
+
+            val missing = missingTrainParams(req)
+            if (missing == false) {
+ 
+              cache.addStatus(req,ResponseStatus.TRAINING_STARTED)
+              doTrainRequest(req)
+
+            }
+      
+            context.stop(self)
+          
+          }
+         
+          case _ => {
+           
+            val msg = Messages.TASK_IS_UNKNOWN(uid,req.task)
+          
+            sender ! Serializer.serializeResponse(failure(req,msg))
+            context.stop(self)
+          
+          }
+          
+        }
+      
+      } catch {
+        
+      case e:Exception => {
+          
+          sender ! Serializer.serializeResponse(failure(req,e.getMessage))
+          context.stop(self)
+         
+        }
+      }
     }
    
     case _ => {
@@ -145,13 +171,21 @@ abstract class RecomWorker(@transient sc:SparkContext) extends BaseActor {
   protected def doBuildRequest(req:ServiceRequest)
 
   /**
-   * Methods to support GET requests
+   * Methods to support PREDICT requests
    */
-  protected def missingGetParams(req:ServiceRequest):Boolean = false
+  protected def missingPredictParams(req:ServiceRequest):Boolean = false
 
-  protected def doGetRequest(req:ServiceRequest):Future[Any]
+  protected def doPredictRequest(req:ServiceRequest):Future[Any]
 
-  protected def buildGetResponse(request:ServiceRequest,intermediate:ServiceResponse):Any
+  protected def buildPredictResponse(request:ServiceRequest, intermediate:ServiceResponse):Any
+  /**
+   * Methods to support RECOMMEND requests
+   */
+  protected def missingRecommendParams(req:ServiceRequest):Boolean = false
+
+  protected def doRecommendRequest(req:ServiceRequest):Future[Any]
+
+  protected def buildRecommendResponse(request:ServiceRequest, intermediate:ServiceResponse):Any
   /**
    * Methods to support TRAIN requests
    */

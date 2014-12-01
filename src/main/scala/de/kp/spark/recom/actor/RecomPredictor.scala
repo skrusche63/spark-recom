@@ -34,7 +34,7 @@ import de.kp.spark.recom.RemoteContext
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class RecomQuestor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseActor {
+class RecomPredictor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseActor {
   
   def receive = {
 
@@ -44,7 +44,18 @@ class RecomQuestor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseAct
       val uid = req.data("uid")
           
       val response = get(req)            
-      // TODO
+      response.onSuccess {
+        case result => {
+          origin ! result
+          context.stop(self)
+        }
+      }
+      response.onFailure {
+        case throwable => {           
+          origin ! failure(req,throwable.toString)	                  
+          context.stop(self)            
+        }	      
+      }
          
     }
     

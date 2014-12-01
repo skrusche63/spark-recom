@@ -60,8 +60,42 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
     
   }
 
-  def doGetRequest(req:ServiceRequest):Future[Any] = null
+  def doPredictRequest(req:ServiceRequest):Future[Any] = {
 
-  def buildGetResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = null
+    /*
+     * The Context-Aware Analysis engine is a general purpose
+     * engine based on factorization models and is capable to
+     * predict target variables for feature vectors.
+     */   
+    val service = "context"
+    val message = Serializer.serializeRequest(new ServiceRequest(service,"get:feature",req.data))
+    
+    rtx.send(service,message)
+     
+  }
+
+  def buildPredictResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = {
+    
+    if (intermediate.status == ResponseStatus.SUCCESS) {
+
+      val features = req.data("features").split(",").map(_.toDouble).toList
+      val target   = intermediate.data("prediction").toDouble
+    
+      TargetedPoint(features,target)
+     
+    } else {
+      /*
+       * In case of an error, send the intermediate message as it contains
+       * the specification of the respective failure
+       */
+      intermediate
+      
+    }    
+
+  }
+
+  def doRecommendRequest(req:ServiceRequest):Future[Any] = null
+
+  def buildRecommendResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = null
  
 }

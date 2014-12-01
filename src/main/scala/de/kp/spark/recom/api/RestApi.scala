@@ -66,17 +66,24 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
 	    }
 	  }
     }  ~ 
-    path("get" / Segment) {subject => 
-	  post {
-	    respondWithStatus(OK) {
-	      ctx => doGet(ctx,subject)
-	    }
-	  }
-    }  ~ 
     path("index" / Segment) {subject =>  
 	  post {
 	    respondWithStatus(OK) {
 	      ctx => doIndex(ctx,subject)
+	    }
+	  }
+    }  ~ 
+    path("predict" / Segment) {subject => 
+	  post {
+	    respondWithStatus(OK) {
+	      ctx => doPredict(ctx,subject)
+	    }
+	  }
+    }  ~ 
+    path("recommend" / Segment) {subject => 
+	  post {
+	    respondWithStatus(OK) {
+	      ctx => doRecommend(ctx,subject)
 	    }
 	  }
     }  ~ 
@@ -143,32 +150,6 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
     }
     
   }
-  
-  /**
-   * 'get' describes requests to retrieve predictions or 
-   * recommendations either from event or item based models
-   */
-  private def doGet[T](ctx:RequestContext,subject:String) = {
-    
-    val service = ""
-      
-    subject match {
-      /* 
-       * Get recommendations (predictions) from event-based
-       * recommender models
-       */
-      case Topics.EVENT => doRequest(ctx,service,"get:event")
-      /* 
-       * Get recommendations (predictions) from item-based
-       * recommender models
-       */
-      case Topics.ITEM => doRequest(ctx,service,"get:item")
-      
-      case _ => {/* do nothing */}
-      
-    }
-    
-  }
 
   /**
    * 'index' describes an administration request to create an
@@ -200,6 +181,57 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
       case _ => {/* do nothing */}
       
     }
+  }
+  
+  /**
+   * 'predict' describes requests to retrieve predictions either 
+   * from event or item based models
+   */
+  private def doPredict[T](ctx:RequestContext,subject:String) = {
+    
+    val service = ""
+      
+    subject match {
+      /* 
+       * Get recommendations (predictions) from event-based
+       * recommender models
+       */
+      case Topics.EVENT => doRequest(ctx,service,"predict:event")
+      /* 
+       * Get recommendations (predictions) from item-based
+       * recommender models
+       */
+      case Topics.ITEM => doRequest(ctx,service,"predict:item")
+      
+      case _ => {/* do nothing */}
+      
+    }
+    
+  }
+  /**
+   * 'recommend' describes requests to retrieve recommendations 
+   * either from event or item based models
+   */
+  private def doRecommend[T](ctx:RequestContext,subject:String) = {
+    
+    val service = ""
+      
+    subject match {
+      /* 
+       * Get recommendations (predictions) from event-based
+       * recommender models
+       */
+      case Topics.EVENT => doRequest(ctx,service,"recommend:event")
+      /* 
+       * Get recommendations (predictions) from item-based
+       * recommender models
+       */
+      case Topics.ITEM => doRequest(ctx,service,"recommend:item")
+      
+      case _ => {/* do nothing */}
+      
+    }
+    
   }
   
   /**
@@ -287,10 +319,18 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
           
           if (result.isInstanceOf[Preferences]) {
             /*
-             * This is the response type used for 'get' requests
-             * that have successfully retrieved recommendations 
+             * This is the response type used for 'predict' and 
+             * also 'recommend' requests that refer to the ALS 
+             * or ASR algorithms 
              */
             ctx.complete(result.asInstanceOf[Preferences])
+          
+          } else if (result.isInstanceOf[TargetedPoint]) {
+            /*
+             * This is the response type used for 'predict'
+             * requests that refer to the CAR algorithm
+             */
+            ctx.complete(result.asInstanceOf[ServiceResponse])
             
           } else if (result.isInstanceOf[ServiceResponse]) {
             /*

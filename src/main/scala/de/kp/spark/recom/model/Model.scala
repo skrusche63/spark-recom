@@ -31,6 +31,8 @@ case class Preference(
 
 case class Preferences(preferences:List[Preference])
 
+case class TargetedPoint(features:List[Double],target:Double)
+
 /**
  * A derived association rule that additionally specifies the matching weight
  * between the antecent field and the respective field in mined and original
