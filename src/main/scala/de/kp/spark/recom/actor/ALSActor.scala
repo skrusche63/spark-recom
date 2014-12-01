@@ -20,10 +20,12 @@ package de.kp.spark.recom.actor
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
+import de.kp.spark.core.Names
+
 import de.kp.spark.core.model._
 import de.kp.spark.recom.model._
 
-import de.kp.spark.recom.{Configuration,Recommender,RemoteContext}
+import de.kp.spark.recom.{Configuration,Recommender,RecommenderModel,RemoteContext}
 
 import de.kp.spark.recom.sink.RedisSink
 import de.kp.spark.recom.hadoop.HadoopIO
@@ -76,8 +78,89 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
 
  }
 
-  def doGetRequest(req:ServiceRequest):Future[Any] = null
+  def doGetRequest(req:ServiceRequest):Future[Any] = {
+    
+    val site  = req.data(Names.REQ_SITE)
+    val users = req.data(Names.REQ_USERS).split(",").toList
+    
+    /*
+     * The response returned is dynamically derived from the
+     * input parameters
+     */
+    val items = if (req.data.contains(Names.REQ_ITEMS)) req.data(Names.REQ_ITEMS).split(",").map(_.toInt).toList else List.empty[Int]
+    val total = if (req.data.contains(Names.REQ_TOTAL)) req.data(Names.REQ_TOTAL).toInt else 0
+    
+    Future {
+    
+      if (users.length == 1 && total > 0 && items.isEmpty) {
+        /*
+         * Retrieve the top 'k' item recommendations
+         * for a certain site and a single user from
+         * the trained ALS model  
+         */  
+        val user = users(0)
+      
+        val model = new RecommenderModel(sc,req)
+        val preferences = Preferences(model.predict(site,user,total))
+    
+        serialize(req.data("uid"),preferences)
+      
+      } else if (users.length == 1 && items.isEmpty == false) {
+      
+        val user = users(0)
+      
+        val model = new RecommenderModel(sc,req)
+        val preferences = Preferences(model.predict(site,user,items))
+    
+        serialize(req.data("uid"),preferences)
+      
+      } else if (users.length > 1 && items.isEmpty == false) {
+      
+        val model = new RecommenderModel(sc,req)
+        val preferences = Preferences(model.predict(site,users,items))
+    
+        serialize(req.data("uid"),preferences)
+      
+      } else {
+      
+        val msg = "Provided combination of input parameters is not supported."
+        Serializer.serializeResponse(failure(req,msg))  
+    
+      }
+    
+    }
+  
+  }
 
-  def buildGetResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = null
+  def buildGetResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = {
+    
+    if (intermediate.status == ResponseStatus.SUCCESS) {
+      /*
+       * Send the list of prefences back to the requestor
+       */
+      Serializer.deserializePreferences(intermediate.data("recommendation"))
+      
+    } else {
+      /*
+       * In case of an error, send the intermediate message as it contains
+       * the specification of the respective failure
+       */
+      intermediate
+      
+    }
+    
+  }
+  /**
+   * In order to be compliant with the functionality of the ASR and CAR actor, 
+   * we have to serialize the result here
+   */   
+  private def serialize(uid:String,preferences:Preferences):String = {
+     
+    val data = Map("uid" -> uid,"recommendation" -> Serializer.serializePreferences(preferences))
+    val response = ServiceResponse("","",data,ResponseStatus.SUCCESS)
+      
+    Serializer.serializeResponse(response)
+     
+  }
   
 }

@@ -281,7 +281,34 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
     val request = new ServiceRequest(service,task,getRequest(ctx))
     implicit val timeout:Timeout = DurationInt(time).second
     
-    val response = ask(master,request).mapTo[ServiceResponse] 
+    val response = ask(master,request) 
+      response.onSuccess {
+        case result => {
+          
+          if (result.isInstanceOf[Preferences]) {
+            /*
+             * This is the response type used for 'get' requests
+             * that have successfully retrieved recommendations 
+             */
+            ctx.complete(result.asInstanceOf[Preferences])
+            
+          } else if (result.isInstanceOf[ServiceResponse]) {
+            /*
+             * This is the common response type used for almost
+             * all requests
+             */
+            ctx.complete(result.asInstanceOf[ServiceResponse])
+            
+          }
+          
+        }
+      
+      }
+
+      response.onFailure {
+        case throwable => ctx.complete(throwable.getMessage)
+      }
+    
     ctx.complete(response)
     
   }

@@ -23,6 +23,7 @@ import org.apache.spark.mllib.recommendation.{ALS,MatrixFactorizationModel,Ratin
 
 import de.kp.spark.core.model._
 
+import de.kp.spark.recom.cache.ALSCache
 import de.kp.spark.recom.model._
 
 import de.kp.spark.recom.hadoop.HadoopIO
@@ -42,11 +43,11 @@ class RecommenderModel(@transient sc:SparkContext,req:ServiceRequest) {
    * For a certain (site,user) predict the 'k' highest scored
    * items
    */
-  def predict(site:String,user:String,num:Int):List[Preference] = {
+  def predict(site:String,user:String,total:Int):List[Preference] = {
     
     val uid = users.getLookup(user)
     
-    val ratings = model.recommendProducts(uid, num)
+    val ratings = model.recommendProducts(uid, total)
     ratings.sortBy(-_.rating).map(x => Preference(site,user,x.product,x.rating)).toList
     
   }
@@ -92,6 +93,26 @@ class RecommenderModel(@transient sc:SparkContext,req:ServiceRequest) {
 
     val ratings = model.predict(data).collect
     ratings.sortBy(-_.rating).map(x => Preference(site,users.getTerms(x.user),x.product,x.rating)).toList
+    
+  }
+  /**
+   * The private method retrieves an ALS model either from the 
+   * ALSCache or from the Hadoop file system
+   */
+  private def get(req:ServiceRequest):MatrixFactorizationModel = {
+    
+    val uid = req.data("uid")
+    if (ALSCache.exists(uid)) {
+      ALSCache.get(uid)
+    
+    } else {
+      
+      val model = HadoopIO.readRecom(sink.model(req))
+      ALSCache.add(uid,model)
+      
+      model
+      
+    }
     
   }
   

@@ -29,8 +29,21 @@ case class Preference(
   site:String,user:String,item:Int,score:Double
 )
 
-case class Preferences(items:List[Preference])
+case class Preferences(preferences:List[Preference])
 
+/**
+ * A derived association rule that additionally specifies the matching weight
+ * between the antecent field and the respective field in mined and original
+ * association rules
+ */
+case class WeightedRule (
+  antecedent:List[Int],consequent:List[Int],support:Int,confidence:Double,weight:Double)
+/**
+ * A set of weighted rules assigned to a certain user of a specific site
+ */
+case class UserRules(site:String,user:String,items:List[WeightedRule])
+
+case class MultiUserRules(items:List[UserRules])
 
 object Algorithms {
   
@@ -57,7 +70,23 @@ object Messages extends BaseMessages {
 
 object ResponseStatus extends BaseStatus
 
-object Serializer extends BaseSerializer
+object Serializer extends BaseSerializer {
+  
+  /** 
+   * Multi user rules specify the result of association analysis 
+   * and are used to build product recommendations built on top 
+   * of association rules
+   */
+  def deserializeMultiUserRules(rules:String):MultiUserRules = read[MultiUserRules](rules)  
+
+  /**
+   * Preferences are the result of the ALS based recommendation
+   * functionality
+   */
+  def serializePreferences(preferences:Preferences):String = write(preferences)
+  def deserializePreferences(preferences:String):Preferences = read[Preferences](preferences)
+  
+}
 
 object Services {
 

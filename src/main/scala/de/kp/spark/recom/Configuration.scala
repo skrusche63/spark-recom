@@ -40,6 +40,13 @@ object Configuration extends CoreConf {
     (duration,retries,timeout)
     
   }
+   
+  def cache:Int = {
+  
+    val cfg = config.getConfig("cache")
+    cfg.getInt("size")   
+    
+  }
 
   override def elastic:HConf = {
   
@@ -60,7 +67,7 @@ object Configuration extends CoreConf {
     
   }
    
-  def model():String = {
+  def model:String = {
   
     val cfg = config.getConfig("model")
     cfg.getString("path")   
