@@ -167,22 +167,23 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
     
   }
 
-  private def doRequest(req:ServiceRequest):Future[ServiceResponse] = {
+  private def doRequest(req:ServiceRequest):Future[Any] = {
 	  
     req.task.split(":")(0) match {
 
-      case "index" => ask(actor("indexer"),req).mapTo[ServiceResponse]
+      case "fields" => ask(actor("fields"),req)
+      case "index" => ask(actor("indexer"),req)
 
-      case "predict" => ask(actor("predictor"),req).mapTo[ServiceResponse]
-      case "recommend" => ask(actor("recommender"),req).mapTo[ServiceResponse]
+      case "predict" => ask(actor("predictor"),req)
+      case "recommend" => ask(actor("recommender"),req)
 
-      case "register"  => ask(actor("registrar"),req).mapTo[ServiceResponse]
-      case "status" => ask(actor("monitor"),req).mapTo[ServiceResponse]
+      case "register"  => ask(actor("registrar"),req)
+      case "status" => ask(actor("monitor"),req)
 
-      case "build" => ask(actor("builder"),req).mapTo[ServiceResponse]
-      case "train" => ask(actor("trainer"),req).mapTo[ServiceResponse]
+      case "build" => ask(actor("builder"),req)
+      case "train" => ask(actor("trainer"),req)
 
-      case "track"  => ask(actor("tracker"),req).mapTo[ServiceResponse]
+      case "track"  => ask(actor("tracker"),req)
        
       case _ => Future {     
         failure(req,Messages.TASK_IS_UNKNOWN(req.data("uid"),req.task))
@@ -250,16 +251,22 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
     worker match {
 
       case "builder" => context.actorOf(Props(new RecomBuilder(sc,rtx)))
-      case "trainer" => context.actorOf(Props(new RecomTrainer(sc,rtx)))
+
+      case "fields" => context.actorOf(Props(new FieldMonitor()))
   
       case "indexer" => context.actorOf(Props(new RecomIndexer()))
-      case "monitor" => context.actorOf(Props(new RecomMonitor()))
 
       case "predictor" => context.actorOf(Props(new RecomPredictor(sc,rtx)))
+      
       case "recommender" => context.actorOf(Props(new RecomRecommender(sc,rtx)))
         
       case "registrar" => context.actorOf(Props(new RecomRegistrar()))        
+
+      case "status" => context.actorOf(Props(new StatusMonitor()))
+      
       case "tracker" => context.actorOf(Props(new RecomTracker()))
+
+      case "trainer" => context.actorOf(Props(new RecomTrainer(sc,rtx)))
 
       case _ => null
       

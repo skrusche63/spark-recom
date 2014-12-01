@@ -18,7 +18,7 @@ package de.kp.spark.recom.actor
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-import de.kp.spark.core.actor.StatusMonitor
+import de.kp.spark.core.actor.StatusQuestor
 import de.kp.spark.recom.Configuration
 
-class RecomMonitor extends StatusMonitor(Configuration)
+class StatusMonitor extends StatusQuestor(Configuration)

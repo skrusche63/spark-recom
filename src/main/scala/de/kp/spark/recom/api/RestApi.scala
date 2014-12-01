@@ -52,13 +52,20 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
   
   val (duration,retries,time) = Configuration.actor   
   val master = system.actorOf(Props(new RecomMaster(sc)), name="recom-master")
- 
+    
   def start() {
     RestService.start(routes,system,host,port)
   }
 
   private def routes:Route = {
 
+    path("admin" / Segment) {subject =>  
+	  post {
+	    respondWithStatus(OK) {
+	      ctx => doAdmin(ctx,subject)
+	    }
+	  }
+    }  ~  
     path("build" / Segment) {subject =>
 	  post {
 	    respondWithStatus(OK) {
@@ -94,13 +101,6 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
 	    }
 	  }
     }  ~ 
-    path("status") {
-	  post {
-	    respondWithStatus(OK) {
-	      ctx => doStatus(ctx)
-	    }
-	  }
-    }  ~ 
     path("track" / Segment) {subject => 
 	  post {
 	    respondWithStatus(OK) {
@@ -121,6 +121,31 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
 	    }
       }
     }
+  }
+  
+  /**
+   * 'admin' is an administration request to determine whether
+   * a certain data mining or knowledge building task has been
+   * finished or not; the only parameter required for status
+   * requests is the unique identifier of a certain task.
+   * 
+   * Another admininistration request retrieves the field
+   * specification that is assigned to certain data mining
+   * or model building task.
+   */
+  private def doAdmin[T](ctx:RequestContext,subject:String) = {
+ 
+    val service = "recom"
+    
+    subject match {
+      
+      case "fields" => doRequest(ctx,service,subject)
+      case "status" => doRequest(ctx,service,subject)
+      
+      case _ => {}
+      
+    }
+    
   }
 
   /**
