@@ -23,7 +23,7 @@ import org.apache.hadoop.conf.{Configuration => HConf}
 
 import de.kp.spark.core.{Configuration => CoreConf}
 
-object Configuration extends CoreConf {
+object Configuration extends Serializable with CoreConf {
 
     /* Load configuration for router */
   val path = "application.conf"

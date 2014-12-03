@@ -22,6 +22,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.mllib.recommendation.{ALS,MatrixFactorizationModel,Rating}
 
 import de.kp.spark.core.model._
+import de.kp.spark.core.redis.RedisDB
 
 import de.kp.spark.recom.cache.ALSCache
 import de.kp.spark.recom.model._
@@ -29,13 +30,13 @@ import de.kp.spark.recom.model._
 import de.kp.spark.recom.hadoop.HadoopIO
 import de.kp.spark.recom.source.ItemSource
 
-import de.kp.spark.recom.sink.RedisSink
 import de.kp.spark.recom.util.{Dict,Items,Users}
 
 class RecommenderModel(@transient sc:SparkContext,req:ServiceRequest) {
-  
-  private val sink = new RedisSink()
-  
+
+  private val (host,port) = Configuration.redis
+  private val sink = new RedisDB(host,port.toInt)
+ 
   private val model = HadoopIO.readRecom(sink.model(req))
   private val users = Users.get(req)
     

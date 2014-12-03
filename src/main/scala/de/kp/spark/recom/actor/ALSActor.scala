@@ -21,20 +21,19 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 import de.kp.spark.core.Names
+import de.kp.spark.core.redis.RedisDB
 
 import de.kp.spark.core.model._
 import de.kp.spark.recom.model._
 
 import de.kp.spark.recom.{Configuration,Recommender,RecommenderModel,RemoteContext}
-
-import de.kp.spark.recom.sink.RedisSink
 import de.kp.spark.recom.hadoop.HadoopIO
 
 import scala.concurrent.Future
 
 class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(sc) {
-  
-  private val sink = new RedisSink()
+
+  val sink = new RedisDB(host,port.toInt)
   
   /**
    * The user rating is built by delegating the request to the 
