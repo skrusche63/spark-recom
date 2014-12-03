@@ -37,7 +37,7 @@ import scala.collection.mutable.ArrayBuffer
  * ASRActor is responsible for interaction with the Association
  * Analysis engine to build recommendations from association rules
  */
-class ASRActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker(sc) {
+class ASRActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(sc) {
   /**
    * Recommendations based on association rules do not need to
    * build user preferences first; therefore, the request is

@@ -32,7 +32,7 @@ import de.kp.spark.recom.hadoop.HadoopIO
 
 import scala.concurrent.Future
 
-class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker(sc) {
+class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(sc) {
   
   private val sink = new RedisSink()
   
@@ -54,8 +54,14 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
   }
  
   def doTrainRequest(req:ServiceRequest) {
+    /*
+     * The training request must provide a name for the correlation 
+     * matrix to uniquely distinguish this matrix from all others
+     */
+    val name = if (req.data.contains(Names.REQ_NAME)) req.data(Names.REQ_NAME) 
+      else throw new Exception("No name for factorization model provided.")
           
-    cache.addStatus(req,ResponseStatus.TRAINING_STARTED)
+    cache.addStatus(req,ResponseStatus.MODEL_TRAINING_STARTED)
     /*
      * Build ALS recommendation model based on the request data;
      * users & items refer to the reference information that is 
@@ -66,7 +72,7 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
           
     /* Register model */
     val now = new java.util.Date()
-    val dir = Configuration.model + "/als-" + now.getTime().toString
+    val dir = String.format("""%s/matrix/%s/%s""",Configuration.model,name,now.getTime().toString)
     /*
      * The ALS model trained is saved on the HDFS file system and
      * must be load before building any recommendations
@@ -74,7 +80,7 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
     HadoopIO.writeRecom(model,dir)
     
     sink.addModel(req,dir)          
-    cache.addStatus(req,ResponseStatus.TRAINING_FINISHED)
+    cache.addStatus(req,ResponseStatus.MODEL_TRAINING_FINISHED)
 
  }
 
@@ -98,14 +104,14 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
         val model = new RecommenderModel(sc, req)
         val preferences = Preferences(model.predict(site,user,items))
     
-        serialize(req.data("uid"),preferences)
+        serialize(req.data(Names.REQ_UID),preferences)
       
       } else if (users.length > 1 && items.isEmpty == false) {
       
         val model = new RecommenderModel(sc, req)
         val preferences = Preferences(model.predict(site,users,items))
     
-        serialize(req.data("uid"),preferences)
+        serialize(req.data(Names.REQ_UID),preferences)
       
       } else {
       
@@ -139,9 +145,17 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
   
   def doRecommendRequest(req:ServiceRequest):Future[Any] = {
     
+    /*
+     * The matrix factorization model does not support 'similar'
+     * requests with respect to any predictor variable 
+     */
+    val topic = req.task.split(":")(1)
+    if (List(Topics.ITEM,Topics.USER).contains(topic) == false)
+      throw new Exception("This recommendation request is not supported for the ALS algorithm.")
+    
     val site  = req.data(Names.REQ_SITE)
     val total = req.data(Names.REQ_TOTAL).toInt
-    
+
     /*
      * The response returned is dynamically derived from the
      * input parameters
@@ -160,14 +174,14 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends RecomWorker
         val model = new RecommenderModel(sc, req)
         val preferences = Preferences(model.recommend(site,user,total))
     
-        serialize(req.data("uid"),preferences)
+        serialize(req.data(Names.REQ_UID),preferences)
       
       } else if (user == null && item != -1) {
       
         val model = new RecommenderModel(sc, req)
         val preferences = Preferences(model.recommend(site,item,total))
     
-        serialize(req.data("uid"),preferences)
+        serialize(req.data(Names.REQ_UID),preferences)
      
       } else {
       

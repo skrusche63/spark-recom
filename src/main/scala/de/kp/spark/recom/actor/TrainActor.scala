@@ -34,7 +34,7 @@ import de.kp.spark.recom.RemoteContext
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class RecomBuilder(@transient sc:SparkContext,rtx:RemoteContext) extends BaseActor {
+class TrainActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseActor {
   
   def receive = {
 
@@ -42,16 +42,16 @@ class RecomBuilder(@transient sc:SparkContext,rtx:RemoteContext) extends BaseAct
       
       val origin = sender    
       val uid = req.data("uid")
-          
+         
       val response = validate(req) match {
             
-        case None => build(req).mapTo[ServiceResponse]            
+        case None => train(req).mapTo[ServiceResponse]            
         case Some(message) => Future {failure(req,message)}
             
       }
 
       onResponse(req,response,origin)
-         
+      
     }
     
     case _ => {
@@ -81,7 +81,7 @@ class RecomBuilder(@transient sc:SparkContext,rtx:RemoteContext) extends BaseAct
   
   }
  
-  private def build(req:ServiceRequest):Future[Any] = {
+  private def train(req:ServiceRequest):Future[Any] = {
 
     val (duration,retries,time) = Configuration.actor      
     implicit val timeout:Timeout = DurationInt(time).second

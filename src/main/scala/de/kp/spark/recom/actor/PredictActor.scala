@@ -24,6 +24,7 @@ import akka.actor.{ActorRef,Props}
 import akka.pattern.ask
 import akka.util.Timeout
 
+import de.kp.spark.core.Names
 import de.kp.spark.core.model._
 
 import de.kp.spark.recom.model._
@@ -34,27 +35,30 @@ import de.kp.spark.recom.RemoteContext
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class RecomRecommender(@transient sc:SparkContext,rtx:RemoteContext) extends BaseActor {
+class PredictActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseActor {
   
   def receive = {
 
     case req:ServiceRequest => {
       
       val origin = sender    
-      val uid = req.data("uid")
           
-      val response = get(req)            
+      val response = predict(req)            
       response.onSuccess {
+        
         case result => {
           origin ! result
           context.stop(self)
         }
+      
       }
       response.onFailure {
+      
         case throwable => {           
           origin ! failure(req,throwable.toString)	                  
           context.stop(self)            
         }	      
+      
       }
          
     }
@@ -73,7 +77,7 @@ class RecomRecommender(@transient sc:SparkContext,rtx:RemoteContext) extends Bas
  
   private def actor(req:ServiceRequest):ActorRef = {
 
-    req.data("algorithm") match {
+    req.data(Names.REQ_ALGORITHM) match {
       
       case Algorithms.ALS => context.actorOf(Props(new ALSActor(sc,rtx)))   
       
@@ -86,7 +90,7 @@ class RecomRecommender(@transient sc:SparkContext,rtx:RemoteContext) extends Bas
   
   }
  
-  private def get(req:ServiceRequest):Future[Any] = {
+  private def predict(req:ServiceRequest):Future[Any] = {
 
     val (duration,retries,time) = Configuration.actor      
     implicit val timeout:Timeout = DurationInt(time).second

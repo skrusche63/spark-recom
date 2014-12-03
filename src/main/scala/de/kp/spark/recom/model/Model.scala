@@ -31,6 +31,11 @@ case class Preference(
 
 case class Preferences(preferences:List[Preference])
 
+case class ScoredField(name:String,score:Double)
+case class SimilarFields(name:String,items:List[ScoredField])
+
+case class Similars(items:List[SimilarFields])
+
 case class TargetedPoint(features:List[Double],target:Double)
 
 /**
@@ -74,19 +79,31 @@ object ResponseStatus extends BaseStatus
 
 object Serializer extends BaseSerializer {
   
-  /** 
+  /*
    * Multi user rules specify the result of association analysis 
    * and are used to build product recommendations built on top 
    * of association rules
    */
   def deserializeMultiUserRules(rules:String):MultiUserRules = read[MultiUserRules](rules)  
 
-  /**
-   * Preferences are the result of the ALS based recommendation
-   * functionality
+  /*
+   * Preferences are the result of the ALS & ASR based prediction
+   * and recommendation functionality
    */
   def serializePreferences(preferences:Preferences):String = write(preferences)
   def deserializePreferences(preferences:String):Preferences = read[Preferences](preferences)
+  /*
+   * Similars are the result of the CAR based recommendation
+   * functionality
+   */
+  def serializeSimilars(similars:Similars):String = write(similars) 
+  def deserializeSimilars(similars:String):Similars = read[Similars](similars)
+  /*
+   * TargetedPoint is the result of the CAR based prediction
+   * functionality
+   */
+  def serializeTargetedPoint(targetedPoint:TargetedPoint):String = write(targetedPoint)
+  def deserializeTargetedPoint(targetedPoint:String):TargetedPoint = read[TargetedPoint](targetedPoint)
   
 }
 
@@ -100,6 +117,16 @@ object Services {
     
   private val services = List(ASSOCIATION,CONTEXT,RATING,SERIES)
   def isService(service:String):Boolean = services.contains(service)
+  
+}
+
+object Sinks {
+
+  val FILE:String = "FILE"
+    
+  private val sinks = List(FILE)
+  
+  def isSink(sink:String):Boolean = sinks.contains(sink)
   
 }
 
@@ -118,10 +145,12 @@ object Sources {
 
 object Topics {
 
-  val EVENT:String = "event" 
-  val ITEM:String  = "item"
+  val EVENT:String   = "event" 
+  val ITEM:String    = "item"
+  val SIMILAR:String = "similar"
+  val USER:String    = "user" 
     
-  private val topics = List(EVENT,ITEM)
+  private val topics = List(EVENT,ITEM,SIMILAR,USER)
   
   def isTopic(topic:String):Boolean = topics.contains(topic)
   

@@ -25,6 +25,8 @@ import akka.pattern.ask
 import akka.util.Timeout
 
 import akka.actor.{OneForOneStrategy, SupervisorStrategy}
+
+import de.kp.spark.core.Names
 import de.kp.spark.core.model._
 
 import de.kp.spark.recom.Configuration
@@ -57,14 +59,13 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
      */
     case message:String => {
 	  	    
-	  val origin = sender
-	  
+	  val origin = sender	  
 	  try {
 	    
 	    deserializeRequest(message) match {
 	      /*
            * We try to deserialize the external message as a ServiceRequest;
-           * this is the most frequent use case and will considered first
+           * this is the most frequent use case and will be considered first
            */
 	      case Some(req) => {
 	      
@@ -77,7 +78,7 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
               case result => origin ! serialize(result)
             }
             response.onFailure {
-              case result => origin ! serialize(failure(req,Messages.GENERAL_ERROR(req.data("uid"))))	      
+              case result => origin ! serialize(failure(req,Messages.GENERAL_ERROR(req.data(Names.REQ_UID))))	      
 	        }
 	      
 	      }
@@ -93,8 +94,7 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
 	           * In this case no response is sent to the sender as this is a 
 	           * notification to a previously invoked data processing task
 	           */
-	          case Some(res) => doResponse(res)
-	          
+	          case Some(res) => doResponse(res)	          
 	          case None => throw new Exception("Unknown message")
 	          
 	        }
@@ -104,11 +104,9 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
 	    }
 	  
 	  } catch {
+	    
 	    case e:Exception => {
-      
-	      val msg = Messages.REQUEST_IS_UNKNOWN()          
-          origin ! Serializer.serializeResponse(failure(null,msg))
-	      
+          origin ! Serializer.serializeResponse(failure(null,e.getMessage))
 	    }
 	  
 	  }
@@ -127,7 +125,7 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
         case result => origin ! result
       }
       response.onFailure {
-        case result => origin ! failure(req,Messages.GENERAL_ERROR(req.data("uid")))	      
+        case result => origin ! failure(req,Messages.GENERAL_ERROR(req.data(Names.REQ_UID)))	      
 	  }
       
     }
@@ -168,28 +166,9 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
   }
 
   private def doRequest(req:ServiceRequest):Future[Any] = {
-	  
-    req.task.split(":")(0) match {
-
-      case "fields" => ask(actor("fields"),req)
-      case "index" => ask(actor("indexer"),req)
-
-      case "predict" => ask(actor("predictor"),req)
-      case "recommend" => ask(actor("recommender"),req)
-
-      case "register"  => ask(actor("registrar"),req)
-      case "status" => ask(actor("monitor"),req)
-
-      case "build" => ask(actor("builder"),req)
-      case "train" => ask(actor("trainer"),req)
-
-      case "track"  => ask(actor("tracker"),req)
-       
-      case _ => Future {     
-        failure(req,Messages.TASK_IS_UNKNOWN(req.data("uid"),req.task))
-      }
-      
-    }
+	
+    val task = req.task.split(":")(0)
+    ask(actor(task),req)
     
   }
   
@@ -209,9 +188,32 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
         /*
          * The response is sent by the Context-Aware analysis engine and 
          * indicates that the building process of a certain factorization
-         * model has been finished successfully; in this case no further
-         * action has to be taken
+         * model or correlation matrix has been finished successfully.
+         * 
+         * We have to determine which training step is referenced, and
+         * in case of a factorization model one must proceed to also train
+         * the correlation matrix. Otherwise no action has to be taken 
          */
+        val status = res.task
+        if (status == ResponseStatus.MATRIX_TRAINING_FINISHED) {
+          /*
+           * In this case, no action is taken as this indicates the final
+           * step of a pipeline of tasks
+           */
+        } else if (status == ResponseStatus.MODEL_TRAINING_FINISHED) {
+          /*
+           * In this case the matrix training request is initiated
+           */
+          val task = "train:matrix"
+          /*
+           * The service is actually not set with here, as the respective
+           * value is determined by the actors that process this request
+           */
+          val req = new ServiceRequest("",task,res.data)
+          ask(actor("train"),req)
+          
+        }
+        
       } 
       case "rating" => {
         /*
@@ -222,19 +224,15 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
          */
         
         val status = res.status
-        if (status == ResponseStatus.BUILDING_FINISHED) {
+        if (status == ResponseStatus.RATING_BUILDING_FINISHED) {
 
-          /*
-           * Build the task: the task value within the response message
-           * from the rating service is either build:item or build:event
-           */
-          val task = res.task.replace("build","train")
+          val task = "train:model"
           /*
            * The service is actually not set with here, as the respective
            * value is determined by the actors that process this request
            */
           val req = new ServiceRequest("",task,res.data)
-          ask(actor("trainer"),req)
+          ask(actor("train"),req)
           
         }
         
@@ -250,25 +248,17 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
     
     worker match {
 
-      case "builder" => context.actorOf(Props(new RecomBuilder(sc,rtx)))
+      case "build"     => context.actorOf(Props(new BuildActor(sc,rtx)))
+      case "fields"    => context.actorOf(Props(new FieldsActor()))  
+      case "index"     => context.actorOf(Props(new IndexActor()))
+      case "predict"   => context.actorOf(Props(new PredictActor(sc,rtx)))      
+      case "recommend" => context.actorOf(Props(new RecommendActor(sc,rtx)))        
+      case "register"  => context.actorOf(Props(new RegisterActor()))        
+      case "status"    => context.actorOf(Props(new StatusActor()))      
+      case "track"     => context.actorOf(Props(new TrackActor()))
+      case "train"     => context.actorOf(Props(new TrainActor(sc,rtx)))
 
-      case "fields" => context.actorOf(Props(new FieldMonitor()))
-  
-      case "indexer" => context.actorOf(Props(new RecomIndexer()))
-
-      case "predictor" => context.actorOf(Props(new RecomPredictor(sc,rtx)))
-      
-      case "recommender" => context.actorOf(Props(new RecomRecommender(sc,rtx)))
-        
-      case "registrar" => context.actorOf(Props(new RecomRegistrar()))        
-
-      case "status" => context.actorOf(Props(new StatusMonitor()))
-      
-      case "tracker" => context.actorOf(Props(new RecomTracker()))
-
-      case "trainer" => context.actorOf(Props(new RecomTrainer(sc,rtx)))
-
-      case _ => null
+      case _ => throw new Exception("Task is unknown.")
       
     }
   

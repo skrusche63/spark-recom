@@ -21,9 +21,11 @@ package de.kp.spark.recom.actor
 import org.apache.spark.SparkContext
 
 import akka.actor.{ActorRef,Props}
+
 import akka.pattern.ask
 import akka.util.Timeout
 
+import de.kp.spark.core.Names
 import de.kp.spark.core.model._
 
 import de.kp.spark.recom.model._
@@ -34,28 +36,27 @@ import de.kp.spark.recom.RemoteContext
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class RecomPredictor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseActor {
+/**
+ * BuildActor is responsible for build implict user ratings from the 
+ * data source provided; this is either an event- or item-based source.
+ */
+class BuildActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseActor {
   
   def receive = {
 
     case req:ServiceRequest => {
       
       val origin = sender    
-      val uid = req.data("uid")
+      val uid = req.data(Names.REQ_UID)
           
-      val response = get(req)            
-      response.onSuccess {
-        case result => {
-          origin ! result
-          context.stop(self)
-        }
+      val response = validate(req) match {
+            
+        case None => build(req).mapTo[ServiceResponse]            
+        case Some(message) => Future {failure(req,message)}
+            
       }
-      response.onFailure {
-        case throwable => {           
-          origin ! failure(req,throwable.toString)	                  
-          context.stop(self)            
-        }	      
-      }
+
+      onResponse(req,response,origin)
          
     }
     
@@ -73,7 +74,7 @@ class RecomPredictor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseA
  
   private def actor(req:ServiceRequest):ActorRef = {
 
-    req.data("algorithm") match {
+    req.data(Names.REQ_ALGORITHM) match {
       
       case Algorithms.ALS => context.actorOf(Props(new ALSActor(sc,rtx)))   
       
@@ -86,12 +87,34 @@ class RecomPredictor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseA
   
   }
  
-  private def get(req:ServiceRequest):Future[Any] = {
+  private def build(req:ServiceRequest):Future[Any] = {
 
     val (duration,retries,time) = Configuration.actor      
     implicit val timeout:Timeout = DurationInt(time).second
     
     ask(actor(req), req)
+    
+  }
+  
+  override def validate(req:ServiceRequest):Option[String] = {
+
+    /**
+     * We have to make sure that there is a sink specified, and,
+     * that the respective sink is set to FILE; this ensures that
+     * the ratings are saved as file on a Hadoop file system 
+     */
+    val uid = req.data(Names.REQ_UID)
+    if (req.data.contains(Names.REQ_SINK) == false) {
+      return Some(Messages.NO_SINK_PROVIDED(uid))    
+      
+    }
+    
+    if (req.data(Names.REQ_SINK) != Sinks.FILE) {
+      return Some(Messages.FILE_SINK_REQUIRED(uid))          
+    }
+    
+    super.validate(req)
+   
     
   }
 

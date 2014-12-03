@@ -28,7 +28,7 @@ import de.kp.spark.recom.model._
 import scala.collection.JavaConversions._
 import scala.collection.mutable.HashMap
 
-class RecomTracker extends BaseActor {
+class TrackActor extends BaseActor {
   
   def receive = {
     /*

@@ -85,7 +85,33 @@ abstract class BaseActor extends Actor with ActorLogging {
 
   }
 
-  protected def serialize(resp:ServiceResponse) = Serializer.serializeResponse(resp)
+  protected def serialize(resp:Any) = {
+    
+    if (resp.isInstanceOf[Preferences]) {
+      /*
+       * This is the response type used for 'predict' and 
+       * also 'recommend' requests that refer to the ALS 
+       * or ASR algorithms 
+      */
+      Serializer.serializePreferences(resp.asInstanceOf[Preferences])
+          
+    } else if (resp.isInstanceOf[TargetedPoint]) {
+      /*
+       * This is the response type used for 'predict'
+       * requests that refer to the CAR algorithm
+       */
+      Serializer.serializeTargetedPoint(resp.asInstanceOf[TargetedPoint])
+            
+    } else if (resp.isInstanceOf[ServiceResponse]) {
+      /*
+       * This is the common response type used for almost
+       * all requests
+       */
+      Serializer.serializeResponse(resp.asInstanceOf[ServiceResponse])
+            
+    }
+    
+  }
   
   protected def validate(req:ServiceRequest):Option[String] = {
 

@@ -21,27 +21,51 @@ package de.kp.spark.recom.actor
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
+import de.kp.spark.core.Names
+
 import de.kp.spark.core.model._
 import de.kp.spark.recom.model._
 
 import scala.concurrent.Future
 
-abstract class RecomWorker(@transient sc:SparkContext) extends BaseActor {
+abstract class BaseWorker(@transient sc:SparkContext) extends BaseActor {
  
   override def receive = {
 
     case req:ServiceRequest => {
       
       val origin = sender 
+      val uid = req.data(Names.REQ_UID)
+
       try {
       
-        val uid = req.data("uid")
         req. task.split(":")(0) match {
-        
+      
+          /*
+           * A 'build' requests initiates the build of a recommender model;
+           * this process, except for association rule mining, start with
+           * the generation of implicit user ratings by leveraging the Akka
+           * remote Preference engine.
+           */
+          case "build" => {
+
+            val missing = missingBuildParams(req)
+            sender ! response(req, missing)
+
+            if (missing == false) doBuildRequest(req)      
+            context.stop(self)
+          
+          }
+
+          /*
+           * A 'predict' request retrieves a rating for a certain dataset
+           * provided with this request; the format of the dataset depends
+           * on the algorithm specified 
+           */
           case "predict" => {
 
             val missing = missingPredictParams(req)
-            sender ! response(req, missing)
+            origin ! response(req, missing)
 
             if (missing == false) {
 
@@ -65,10 +89,15 @@ abstract class RecomWorker(@transient sc:SparkContext) extends BaseActor {
           
           }
         
+          /*
+           * A 'predict' request retrieves a rating for a certain dataset
+           * provided with this request; the format of the dataset depends
+           * on the algorithm specified 
+           */
           case "recommend" => {
 
             val missing = missingRecommendParams(req)
-            sender ! response(req, missing)
+            origin ! response(req, missing)
 
             if (missing == false) {
 
@@ -90,27 +119,6 @@ abstract class RecomWorker(@transient sc:SparkContext) extends BaseActor {
             context.stop(self)
           
           }
-      
-          /*
-           * This request builds implicit user ratings using the
-           * remote Akka user preference engine; it is the first
-           * step of generating a certain recommender model
-           */
-          case "build" => {
-
-            val missing = missingBuildParams(req)
-            sender ! response(req, missing)
-
-            if (missing == false) {
-
-              cache.addStatus(req,ResponseStatus.BUILDING_STARTED)
-              doBuildRequest(req)
-          
-            }
-      
-            context.stop(self)
-          
-          }
         
           /*
            * This request trains a certain recommender model; it is the
@@ -119,13 +127,9 @@ abstract class RecomWorker(@transient sc:SparkContext) extends BaseActor {
           case "train" => {
 
             val missing = missingTrainParams(req)
-            if (missing == false) {
- 
-              cache.addStatus(req,ResponseStatus.TRAINING_STARTED)
-              doTrainRequest(req)
+            sender ! response(req, missing)
 
-            }
-      
+            if (missing == false) doTrainRequest(req)     
             context.stop(self)
           
           }
@@ -134,7 +138,7 @@ abstract class RecomWorker(@transient sc:SparkContext) extends BaseActor {
            
             val msg = Messages.TASK_IS_UNKNOWN(uid,req.task)
           
-            sender ! Serializer.serializeResponse(failure(req,msg))
+            origin ! failure(req,msg)
             context.stop(self)
           
           }
@@ -143,9 +147,9 @@ abstract class RecomWorker(@transient sc:SparkContext) extends BaseActor {
       
       } catch {
         
-      case e:Exception => {
+        case e:Exception => {
           
-          sender ! Serializer.serializeResponse(failure(req,e.getMessage))
+          origin ! failure(req,e.getMessage)
           context.stop(self)
          
         }
@@ -157,7 +161,7 @@ abstract class RecomWorker(@transient sc:SparkContext) extends BaseActor {
       val origin = sender               
       val msg = Messages.REQUEST_IS_UNKNOWN()          
           
-      origin ! Serializer.serializeResponse(failure(null,msg))
+      origin ! failure(null,msg)
       context.stop(self)
       
     }

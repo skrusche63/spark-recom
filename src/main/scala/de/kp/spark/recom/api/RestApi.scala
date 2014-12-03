@@ -243,15 +243,19 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
       
     subject match {
       /* 
-       * Get recommendations (predictions) from event-based
-       * recommender models
+       * Recommend 'item' to a certain (site,user) combination
        */
-      case Topics.EVENT => doRequest(ctx,service,"recommend:event")
+      case Topics.ITEM => doRequest(ctx,service,"recommend:user")
       /* 
-       * Get recommendations (predictions) from item-based
-       * recommender models
+       * Recommend 'similar' items to a certain site and list of 
+       * items; this is request is actually restricted to the 
+       * Context-Aware Analysis engine
        */
-      case Topics.ITEM => doRequest(ctx,service,"recommend:item")
+      case Topics.SIMILAR => doRequest(ctx,service,"recommend:similar")
+      /* 
+       * Recommend 'user' to a certain (site,item) combination
+       */
+      case Topics.USER => doRequest(ctx,service,"recommend:user")
       
       case _ => {/* do nothing */}
       
@@ -349,13 +353,20 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
              * or ASR algorithms 
              */
             ctx.complete(result.asInstanceOf[Preferences])
-          
+
+          } else if (result.isInstanceOf[Similars]) {
+             /*
+             * This is the response type used for 'recommend'
+             * requests that refer to the CAR algorithm
+             */
+             ctx.complete(result.asInstanceOf[Similars])
+        
           } else if (result.isInstanceOf[TargetedPoint]) {
             /*
              * This is the response type used for 'predict'
              * requests that refer to the CAR algorithm
              */
-            ctx.complete(result.asInstanceOf[ServiceResponse])
+            ctx.complete(result.asInstanceOf[TargetedPoint])
             
           } else if (result.isInstanceOf[ServiceResponse]) {
             /*

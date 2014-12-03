@@ -21,4 +21,4 @@ package de.kp.spark.recom.actor
 import de.kp.spark.core.actor.StatusQuestor
 import de.kp.spark.recom.Configuration
 
-class StatusMonitor extends StatusQuestor(Configuration)
+class StatusActor extends StatusQuestor(Configuration)

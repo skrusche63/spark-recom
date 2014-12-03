@@ -24,6 +24,7 @@ import akka.actor.{ActorRef,Props}
 import akka.pattern.ask
 import akka.util.Timeout
 
+import de.kp.spark.core.Names
 import de.kp.spark.core.model._
 
 import de.kp.spark.recom.model._
@@ -34,24 +35,31 @@ import de.kp.spark.recom.RemoteContext
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class RecomTrainer(@transient sc:SparkContext,rtx:RemoteContext) extends BaseActor {
+class RecommendActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseActor {
   
   def receive = {
 
     case req:ServiceRequest => {
       
       val origin = sender    
-      val uid = req.data("uid")
-         
-      val response = validate(req) match {
-            
-        case None => train(req).mapTo[ServiceResponse]            
-        case Some(message) => Future {failure(req,message)}
-            
+           
+      val response = recommend(req)            
+      response.onSuccess {
+        
+        case result => { 
+          origin ! result
+          context.stop(self)        
+        }
       }
-
-      onResponse(req,response,origin)
+      response.onFailure {
+        
+        case throwable => {           
+          origin ! failure(req,throwable.toString)	                  
+          context.stop(self)            
+        }	      
       
+      }
+         
     }
     
     case _ => {
@@ -68,7 +76,7 @@ class RecomTrainer(@transient sc:SparkContext,rtx:RemoteContext) extends BaseAct
  
   private def actor(req:ServiceRequest):ActorRef = {
 
-    req.data("algorithm") match {
+    req.data(Names.REQ_ALGORITHM) match {
       
       case Algorithms.ALS => context.actorOf(Props(new ALSActor(sc,rtx)))   
       
@@ -81,7 +89,7 @@ class RecomTrainer(@transient sc:SparkContext,rtx:RemoteContext) extends BaseAct
   
   }
  
-  private def train(req:ServiceRequest):Future[Any] = {
+  private def recommend(req:ServiceRequest):Future[Any] = {
 
     val (duration,retries,time) = Configuration.actor      
     implicit val timeout:Timeout = DurationInt(time).second

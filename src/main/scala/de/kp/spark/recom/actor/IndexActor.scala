@@ -18,7 +18,7 @@ package de.kp.spark.recom.actor
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-import de.kp.spark.core.actor.FieldQuestor
+import de.kp.spark.core.actor.BaseIndexer
 import de.kp.spark.recom.Configuration
 
-class FieldMonitor extends FieldQuestor(Configuration)
+class IndexActor extends BaseIndexer(Configuration)
