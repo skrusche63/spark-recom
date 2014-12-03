@@ -59,11 +59,15 @@ object Configuration extends CoreConf {
     conf
     
   }
-   
+    
   override def file:List[String] = {
   
     val cfg = config.getConfig("file")
-    List(cfg.getString("path"))   
+    
+    val event = cfg.getString("event")   
+    val item  = cfg.getString("item")   
+    
+    List(event,item)
     
   }
    

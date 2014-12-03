@@ -32,8 +32,9 @@ case class Preference(
 case class Preferences(preferences:List[Preference])
 
 case class ScoredField(name:String,score:Double)
-case class SimilarFields(name:String,items:List[ScoredField])
+case class ScoredFields(items:List[ScoredField])
 
+case class SimilarFields(name:String,items:List[ScoredField])
 case class Similars(items:List[SimilarFields])
 
 case class TargetedPoint(features:List[Double],target:Double)
@@ -92,6 +93,12 @@ object Serializer extends BaseSerializer {
    */
   def serializePreferences(preferences:Preferences):String = write(preferences)
   def deserializePreferences(preferences:String):Preferences = read[Preferences](preferences)
+  /*
+   * ScoredFields are the result of the CAR based recommendation
+   * functionality
+   */  
+  def serializeScoredFields(scoredFields:ScoredFields):String = write(scoredFields) 
+  def deserializeScoredFields(scoredFields:String):ScoredFields = read[ScoredFields](scoredFields)
   /*
    * Similars are the result of the CAR based recommendation
    * functionality

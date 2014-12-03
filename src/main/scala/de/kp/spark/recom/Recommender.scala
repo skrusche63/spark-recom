@@ -27,7 +27,7 @@ import de.kp.spark.recom.cache.ALSCache
 import de.kp.spark.recom.model._
 
 import de.kp.spark.recom.hadoop.HadoopIO
-import de.kp.spark.recom.source.NPrefSource
+import de.kp.spark.recom.source.ItemSource
 
 import de.kp.spark.recom.sink.RedisSink
 import de.kp.spark.recom.util.{Dict,Items,Users}
@@ -153,10 +153,10 @@ class Recommender(@transient sc:SparkContext) extends Serializable {
     val lambda = if (req.data.contains("lambda")) req.data("lambda").toDouble else 0.01
 
     /*
-     * The format of the 'items' is; site(String), user(String), 
+     * The format of the 'items' is: site(String), user(String), 
      * item (Int) and preference (Int)
      */
-    val source = new NPrefSource(sc)
+    val source = new ItemSource(sc)
     val nprefs = source.get(req).repartition(partitions)
     /*
      * Create user dictionary as the ALS predictor requires 

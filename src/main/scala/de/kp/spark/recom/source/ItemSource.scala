@@ -21,13 +21,34 @@ package de.kp.spark.recom.source
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
+import de.kp.spark.core.Names
 import de.kp.spark.core.model._
 
-class NPrefSource(@transient sc:SparkContext) {
+import de.kp.spark.core.source.FileSource
+
+import de.kp.spark.recom.Configuration
+import de.kp.spark.recom.model._
+
+class ItemSource(@transient sc:SparkContext) {
 
   def get(req:ServiceRequest):RDD[(String,String,Int,Int)] = {
-    // TODO
-    null
-
+   
+    val algorithm = req.data(Names.REQ_ALGORITHM)
+    if (algorithm == Algorithms.ALS) {
+    
+      val path = Configuration.file(1)
+      val rawset = new FileSource(sc).connect(path,req)
+      rawset.map(line => {
+        
+        val Array(site,user,item,pref) = line.split(",")
+        (site,user,item.toInt,pref.toInt)
+        
+      })
+      
+    } else {
+      throw new Exception("Recommending items for an item data source is restricted to the ALS algorithm.")
+    }
+    
   }
+
 }

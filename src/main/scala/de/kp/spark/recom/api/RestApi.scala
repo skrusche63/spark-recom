@@ -245,7 +245,7 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
       /* 
        * Recommend 'item' to a certain (site,user) combination
        */
-      case Topics.ITEM => doRequest(ctx,service,"recommend:user")
+      case Topics.ITEM => doRequest(ctx,service,"recommend:item")
       /* 
        * Recommend 'similar' items to a certain site and list of 
        * items; this is request is actually restricted to the 
@@ -353,6 +353,13 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
              * or ASR algorithms 
              */
             ctx.complete(result.asInstanceOf[Preferences])
+
+          } else if (result.isInstanceOf[ScoredFields]) {
+             /*
+             * This is the response type used for 'recommend'
+             * requests that refer to the CAR algorithm
+             */
+             ctx.complete(result.asInstanceOf[ScoredFields])
 
           } else if (result.isInstanceOf[Similars]) {
              /*

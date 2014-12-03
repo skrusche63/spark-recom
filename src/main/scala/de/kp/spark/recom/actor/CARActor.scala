@@ -29,6 +29,7 @@ import de.kp.spark.recom.model._
 import de.kp.spark.recom.RemoteContext
 import de.kp.spark.recom.format.CARFormatter
 
+import de.kp.spark.recom.source.EventSource
 import scala.concurrent.Future
 
 class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(sc) {
@@ -53,7 +54,15 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
    * to the context-aware analysis engine
    */
   def doTrainRequest(req:ServiceRequest) {
-      
+    
+    /*
+     * Train requests initiated by the Recommender are actually
+     * restricted to file data sources
+     */
+    val source = req.data(Names.REQ_SOURCE)
+    if (source != Sources.FILE)
+      throw new Exception("The CAR algorithm actually only supports file-based data sources.")
+    
     val service = "context"
     val message = Serializer.serializeRequest(new ServiceRequest(service,req.task,req.data))
     /*
@@ -116,7 +125,7 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
     if (intermediate.status == ResponseStatus.SUCCESS) {
 
       val features = req.data("features").split(",").map(_.toDouble).toList
-      val target   = intermediate.data("prediction").toDouble
+      val target   = intermediate.data("feature").toDouble
     
       TargetedPoint(features,target)
      
@@ -136,8 +145,25 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
     val topic = req.task.split(":")(1)
     topic match {
       
-      case Topics.SIMILAR => {
+      case Topics.ITEM => {
+        
+        val columns = new EventSource(sc).getRatedItems(req).mkString(",")
+        
+        val filter = List(Names.REQ_USER,Names.REQ_CONTEXT)
+        val data = Map(Names.REQ_COLUMNS -> columns) ++ req.data.filter(kv => filter.contains(kv._1) == false)
+        
+        val service = "context"
+        val message = Serializer.serializeRequest(new ServiceRequest(service,"get:item",req.data))
+    
+        rtx.send(service,message)
+        
+      }
       
+      case Topics.SIMILAR => {
+        /*
+         * This request determines for each item in a list those items that are most
+         * similar; the number of items must be restricted by a request parameter
+         */
         val service = "context"
         val message = Serializer.serializeRequest(new ServiceRequest(service,"get:similar",req.data))
     
@@ -154,8 +180,15 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
   def buildRecommendResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = {
     
     if (intermediate.status == ResponseStatus.SUCCESS) {
+
+      if (req.data.contains(Topics.ITEM)) {
+        /*
+         * This response describes the top most similar items with 
+         * respect to the a user's list of rated items 
+         */
+        Serializer.deserializeScoredFields(req.data(Topics.ITEM))
       
-      if (req.data.contains(Topics.SIMILAR)) {
+      } else if (req.data.contains(Topics.SIMILAR)) {
         /*
          * This response describes the top most similar items with 
          * respect to list of items
