@@ -22,8 +22,20 @@ import org.apache.spark.SparkContext
 import akka.actor.{ActorSystem,Props}
 
 import de.kp.spark.recom.actor.RecomMaster
-
-class AkkaApi(system:ActorSystem,@transient val sc:SparkContext) {
+/**
+ * The Akka API is used to receive messages from Akka engines
+ * that are used in collaboration by the Recommender System.
+ * 
+ * These services are:
+ * 
+ * 1) Association Analysis Engine
+ * 
+ * 2) Context-Aware Analysis Engine
+ * 
+ * 3) User Preference Engine
+ * 
+ */
+class AkkaApi(system:ActorSystem,@transient sc:SparkContext) {
 
   val master = system.actorOf(Props(new RecomMaster(sc)), name="recom-master")
 

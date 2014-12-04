@@ -30,7 +30,7 @@ import spray.http.StatusCodes._
 import spray.routing.{Directives,HttpService,RequestContext,Route}
 
 import scala.concurrent.{ExecutionContext}
-import scala.concurrent.duration.Duration
+//import scala.concurrent.duration.Duration
 import scala.concurrent.duration.DurationInt
 
 import scala.util.parsing.json._
@@ -43,7 +43,7 @@ import de.kp.spark.recom.model._
 
 import de.kp.spark.recom.actor.{RecomMaster}
 
-class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkContext) extends HttpService with Directives {
+class RestApi(host:String,port:Int,system:ActorSystem,@transient sc:SparkContext) extends HttpService with Directives {
 
   implicit val ec:ExecutionContext = system.dispatcher  
   import de.kp.spark.core.rest.RestJsonSupport._
@@ -58,7 +58,27 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
   }
 
   private def routes:Route = {
-
+    /**
+     * The 'admin' request type distinguishes between 
+     * 
+     * a) /admin/fields 
+     * 
+     * This request retrieve the field specification that has been registered
+     * for a certain model and a specifc data mining or model building task:
+     *  
+     *            Recommender ---- ( fields ) ----> Redis
+     * 
+     * note, that a task can control different models, which are distinguished 
+     * by the respective model name
+     * 
+     * b) /admin/status
+     * 
+     * This request retrieves the actual (last) status of a mining or model building
+     * task or a list of all stati that refer to a certain task.
+     *  
+     *            Recommender ---- ( status ) ----> Redis
+     * 
+     */
     path("admin" / Segment) {subject =>  
 	  post {
 	    respondWithStatus(OK) {
@@ -73,6 +93,16 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
 	    }
 	  }
     }  ~ 
+    /**
+     * The 'index' request supports creation of an Elasticsearch index either for event
+     * based or item based data sources: 
+     *  
+     *            Recommender ---- ( index ) ----> Elasticsearch index
+     * 
+     * In the context of this Recommender, a data source is considered a source for the 
+     * Preference engine.
+     * 
+     */
     path("index" / Segment) {subject =>  
 	  post {
 	    respondWithStatus(OK) {
@@ -94,6 +124,14 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
 	    }
 	  }
     }  ~ 
+    /**
+     * The 'register' request supports the registration of a field or metadata specification
+     * for a certain mining or model building task (uid) and a specific matrix or model, 
+     * identified by a unique 'name':
+     *  
+     *            Recommender ---- ( register ) ----> Redis
+     * 
+     */
     path("register" / Segment) {subject =>  
 	  post {
 	    respondWithStatus(OK) {
@@ -101,6 +139,14 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
 	    }
 	  }
     }  ~ 
+    /**
+     * The 'track' request type supports tracking of 'event' and 'item' based information 
+     * objects; these objects may be accompanied by an explicit 'score' field. Note, that
+     * this field MUST be provided, if an explicit rating approach is used to train a model.
+     *  
+     *            Recommender ---- ( track ) ----> Elasticsearch index
+     * 
+     */
     path("track" / Segment) {subject => 
 	  post {
 	    respondWithStatus(OK) {
@@ -343,56 +389,55 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient val sc:SparkCon
     implicit val timeout:Timeout = DurationInt(time).second
     
     val response = ask(master,request) 
-      response.onSuccess {
-        case result => {
-          
-          if (result.isInstanceOf[Preferences]) {
-            /*
-             * This is the response type used for 'predict' and 
-             * also 'recommend' requests that refer to the ALS 
-             * or ASR algorithms 
-             */
-            ctx.complete(result.asInstanceOf[Preferences])
-
-          } else if (result.isInstanceOf[ScoredFields]) {
-             /*
-             * This is the response type used for 'recommend'
-             * requests that refer to the CAR algorithm
-             */
-             ctx.complete(result.asInstanceOf[ScoredFields])
-
-          } else if (result.isInstanceOf[Similars]) {
-             /*
-             * This is the response type used for 'recommend'
-             * requests that refer to the CAR algorithm
-             */
-             ctx.complete(result.asInstanceOf[Similars])
+    response.onSuccess {
         
-          } else if (result.isInstanceOf[TargetedPoint]) {
-            /*
-             * This is the response type used for 'predict'
-             * requests that refer to the CAR algorithm
-             */
-            ctx.complete(result.asInstanceOf[TargetedPoint])
-            
-          } else if (result.isInstanceOf[ServiceResponse]) {
-            /*
-             * This is the common response type used for almost
-             * all requests
-             */
-            ctx.complete(result.asInstanceOf[ServiceResponse])
-            
-          }
+      case result => {
           
-        }
-      
-      }
+        if (result.isInstanceOf[Preferences]) {
+          /*
+           * This is the response type used for 'predict' and 
+           * also 'recommend' requests that refer to the ALS 
+           * or ASR algorithms 
+           */
+          ctx.complete(result.asInstanceOf[Preferences])
 
-      response.onFailure {
-        case throwable => ctx.complete(throwable.getMessage)
+        } else if (result.isInstanceOf[ScoredFields]) {
+          /*
+           * This is the response type used for 'recommend'
+           * requests that refer to the CAR algorithm
+           */
+           ctx.complete(result.asInstanceOf[ScoredFields])
+
+        } else if (result.isInstanceOf[Similars]) {
+          /*
+           * This is the response type used for 'recommend'
+           * requests that refer to the CAR algorithm
+           */
+           ctx.complete(result.asInstanceOf[Similars])
+        
+        } else if (result.isInstanceOf[TargetedPoint]) {
+          /*
+           * This is the response type used for 'predict'
+           * requests that refer to the CAR algorithm
+           */
+          ctx.complete(result.asInstanceOf[TargetedPoint])
+            
+        } else if (result.isInstanceOf[ServiceResponse]) {
+          /*
+           * This is the common response type used for almost
+           * all requests
+           */
+          ctx.complete(result.asInstanceOf[ServiceResponse])
+            
+        }
+          
       }
-    
-    ctx.complete(response)
+      
+    }
+
+    response.onFailure {
+      case throwable => ctx.complete(throwable.getMessage)
+    }
     
   }
 
