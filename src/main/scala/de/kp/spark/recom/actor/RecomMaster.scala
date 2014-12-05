@@ -27,6 +27,8 @@ import akka.util.Timeout
 import akka.actor.{OneForOneStrategy, SupervisorStrategy}
 
 import de.kp.spark.core.Names
+
+import de.kp.spark.core.actor._
 import de.kp.spark.core.model._
 
 import de.kp.spark.recom.Configuration
@@ -248,15 +250,29 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
     
     worker match {
 
-      case "build"     => context.actorOf(Props(new BuildActor(sc,rtx)))
-      case "fields"    => context.actorOf(Props(new FieldsActor()))  
-      case "index"     => context.actorOf(Props(new IndexActor()))
+      case "build" => context.actorOf(Props(new BuildActor(sc,rtx)))
+      case "train" => context.actorOf(Props(new TrainActor(sc,rtx)))
+
       case "predict"   => context.actorOf(Props(new PredictActor(sc,rtx)))      
-      case "recommend" => context.actorOf(Props(new RecommendActor(sc,rtx)))        
-      case "register"  => context.actorOf(Props(new RegisterActor()))        
-      case "status"    => context.actorOf(Props(new StatusActor()))      
-      case "track"     => context.actorOf(Props(new TrackActor()))
-      case "train"     => context.actorOf(Props(new TrainActor(sc,rtx)))
+      case "recommend" => context.actorOf(Props(new RecommendActor(sc,rtx)))  
+
+      /*
+       * Metadata management is part of the core functionality; field or metadata
+       * specifications can be registered in, and retrieved from a Redis database
+       */
+      case "fields"   => context.actorOf(Props(new FieldQuestor(Configuration)))
+      case "register" => context.actorOf(Props(new FieldRegistrar(Configuration)))        
+      /*
+       * Index management is part of the core functionality; an Elasticsearch 
+       * index can be created and appropriate (tracked) items can be saved.
+       */  
+      case "index" => context.actorOf(Props(new BaseIndexer(Configuration)))
+      case "track" => context.actorOf(Props(new BaseTracker(Configuration)))
+      /*
+       * Status management is part of the core functionality and comprises the
+       * retrieval of the stati of a certain data mining or model building task
+       */        
+      case "status" => context.actorOf(Props(new StatusQuestor(Configuration)))
 
       case _ => throw new Exception("Task is unknown.")
       
