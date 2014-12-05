@@ -110,6 +110,11 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient sc:SparkContext
 	    }
 	  }
     }  ~ 
+    /**
+     * The 'predict' request supports rating prediction for for a certain provided dataset;
+     * the dataset depends on the algorithm selected. These requests are restricted to the 
+     * ALS and CAR algorithm.
+     */
     path("predict" / Segment) {subject => 
 	  post {
 	    respondWithStatus(OK) {
@@ -264,13 +269,11 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient sc:SparkContext
       
     subject match {
       /* 
-       * Get recommendations (predictions) from event-based
-       * recommender models
+       * Get rating predictions from event-based models
        */
       case Topics.EVENT => doRequest(ctx,service,"predict:event")
       /* 
-       * Get recommendations (predictions) from item-based
-       * recommender models
+       * Get rating predictions from item-based models
        */
       case Topics.ITEM => doRequest(ctx,service,"predict:item")
       

@@ -46,7 +46,17 @@ class ASRActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
   def doBuildRequest(req:ServiceRequest) {
 
     val service = "association"    
-    doTrainRequest(new ServiceRequest(service,"train",req.data))
+    /*
+     * The 'algorithm' parameter is specified as 'ASR'; the respective Association
+     * Analysis engine, however, distinguishes between 'TOPK' and 'TOPKNR' algorithms.
+     * 
+     * For recommendation purposes, we use the 'TOPKNR' association rule algorithm.
+     */
+    val data = req.data.map(x => {
+      if (x._1 == Names.REQ_ALGORITHM) (Names.REQ_ALGORITHM,"TOPKNR") else x
+    })
+    
+    doTrainRequest(new ServiceRequest(service,"train",data))
     
   }
   /**

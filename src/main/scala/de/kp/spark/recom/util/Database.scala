@@ -18,47 +18,46 @@ package de.kp.spark.recom.util
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
+import de.kp.spark.core.Names
+
 import de.kp.spark.core.model._
-import de.kp.spark.core.redis.RedisClient
+import de.kp.spark.core.redis.RedisDB
 
 import de.kp.spark.recom.Configuration
-import scala.collection.JavaConversions._
 
-object Users {
+abstract class DBObject extends Serializable {
 
   val (host,port) = Configuration.redis
-  val client = RedisClient(host,port.toInt)
+  val client = new RedisDB(host,port.toInt)
   
-  private def buildFromRedis(req:ServiceRequest):Seq[String] = {
-        
-    val k = "users:" + req.data("site")
-    val data = client.zrange(k, 0, -1)
+  def exists(req:ServiceRequest,topic:String):Boolean = {
+    
+    val k = topic + ":" + req.data(Names.REQ_UID) + ":" + req.data(Names.REQ_NAME)
+    client.exists(k)
+    
+  }
+  
+  def get(req:ServiceRequest):Dict
+  
+}
 
-    val users = if (data.size() == 0) {
-      List.empty[String]
-    
-    } else {
-      
-      data.map(record => {
-        /* format = timestamp:item:name */
-        val Array(timestamp,uid,name) = record.split(":")
-        uid
-        
-      }).toList
-      
-    }
-    
-    users
+object Events extends DBObject {
   
-  }
+  override def get(req:ServiceRequest):Dict = new Dict().build(client.events(req))  
+  def exists(req:ServiceRequest):Boolean = super.exists(req,"event")
   
-  def get(req:ServiceRequest):Dict = {
-    /**
-     * Actually the user database is retrieved from
-     * Redis instance
-     */
-    new Dict().build(buildFromRedis(req))
-    
-  }
+}
+
+object Items extends DBObject {
+  
+  override def get(req:ServiceRequest):Dict = new Dict().build(client.items(req))
+  def exists(req:ServiceRequest):Boolean = super.exists(req,"item")
+
+}
+
+object Users extends DBObject {
+  
+  override def get(req:ServiceRequest):Dict = new Dict().build(client.users(req))
+  def exists(req:ServiceRequest):Boolean = super.exists(req,"user")
 
 }

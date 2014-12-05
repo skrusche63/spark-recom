@@ -38,11 +38,11 @@ class EventSource(@transient sc:SparkContext) {
   val (host,port) = Configuration.redis
   val cache = new RedisCache(host,port.toInt)
   /**
-   * The method retrieves the list of items that have been
-   * rated by a certain user and uses the additional context
-   * information for filtering
+   * The method retrieves the list of items that have been rated by a certain user and 
+   * uses the additional context information for filtering; the respective items are 
+   * specified by their column positions in the feature representation of an event.
    */
-  def getRatedItems(req:ServiceRequest):List[Int] = {
+  def getItemsByCol(req:ServiceRequest):List[Int] = {
     
     val algorithm = req.data(Names.REQ_ALGORITHM)
     if (algorithm == Algorithms.CAR) {

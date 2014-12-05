@@ -27,7 +27,7 @@ import de.kp.spark.core.model._
 import de.kp.spark.recom.model._
 
 import de.kp.spark.recom.RemoteContext
-import de.kp.spark.recom.format.CARFormatter
+import de.kp.spark.recom.handler.CARHandler
 
 import de.kp.spark.recom.source.EventSource
 import scala.concurrent.Future
@@ -76,47 +76,10 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
 
   def doPredictRequest(req:ServiceRequest):Future[Any] = {
 
-    val uflag = req.data.contains(Names.REQ_USER)
-    val iflag = req.data.contains(Names.REQ_ITEM)
-    
-    val cflag = req.data.contains(Names.REQ_CONTEXT)
-    val fflag = req.data.contains(Names.REQ_FEATURES)
-    
-    if (fflag) {
-      /*
-       * This request type is usually not used as it describes a
-       * very basic approach to predictions with a full specified
-       * feature vector
-       */
-      val service = "context"
-      val message = Serializer.serializeRequest(new ServiceRequest(service,"get:feature",req.data))
-    
-      rtx.send(service,message)
-    
-    } else if (uflag && iflag && cflag) {
-      /*
-       * This is the common request type, where a certain (user,item) pair 
-       * and an observed context is provided; in this case, the data are
-       * transformed into the basic feature vector
-       */
-      val features = new CARFormatter().format(req).mkString(",")
-      val data = req.data.filter(x => x._1 != Names.REQ_USER && x._1 != Names.REQ_ITEM).map(x => {
-        
-        if (x._1 == Names.REQ_CONTEXT) (Names.REQ_FEATURES,features) else x
-        
-      })
-      
-      val service = "context"
-      val message = Serializer.serializeRequest(new ServiceRequest(service,"get:feature",data))
-    
-      rtx.send(service,message)
-      
-    } else {
-      
-      val msg = "Provided combination of input parameters is not supported."
-      Future {Serializer.serializeResponse(failure(req,msg))}  
-    
-    }
+    val message = new CARHandler().buildFeatureReq(req)
+
+    val service = "context"
+    rtx.send(service,message)
      
   }
 
@@ -147,7 +110,7 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
       
       case Topics.ITEM => {
         
-        val columns = new EventSource(sc).getRatedItems(req).mkString(",")
+        val columns = new EventSource(sc).getItemsByCol(req).mkString(",")
         
         val filter = List(Names.REQ_USER,Names.REQ_CONTEXT)
         val data = Map(Names.REQ_COLUMNS -> columns) ++ req.data.filter(kv => filter.contains(kv._1) == false)
