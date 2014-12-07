@@ -46,7 +46,7 @@ class RecommenderModel(@transient sc:SparkContext,req:ServiceRequest) {
    */
   def predict(site:String,user:String,item:Int):List[Preference] = {
     
-    val uid = users.getLookup(user)
+    val uid = users.field2index(user)
     
     val rating = model.predict(uid, item)
     List(Preference(site,user,item,rating))
@@ -59,7 +59,7 @@ class RecommenderModel(@transient sc:SparkContext,req:ServiceRequest) {
    */
   def predict(site:String,user:String,items:List[Int]):List[Preference] = {
 
-    val uid = users.getLookup(user)
+    val uid = users.field2index(user)
     val candidates = sc.parallelize(items)
     
     val ratings = model.predict(candidates.map((uid, _))).collect
@@ -85,7 +85,7 @@ class RecommenderModel(@transient sc:SparkContext,req:ServiceRequest) {
     
     val data = sc.parallelize(pairs.map(pair => {
       
-      val uid = users.getLookup(pair._1)
+      val uid = users.field2index(pair._1)
       val iid = pair._2
       
       (uid,iid)
@@ -93,7 +93,7 @@ class RecommenderModel(@transient sc:SparkContext,req:ServiceRequest) {
     }))
 
     val ratings = model.predict(data).collect
-    ratings.sortBy(-_.rating).map(x => Preference(site,users.getTerms(x.user),x.product,x.rating)).toList
+    ratings.sortBy(-_.rating).map(x => Preference(site,users.index2field(x.user),x.product,x.rating)).toList
     
   }
   
@@ -102,7 +102,7 @@ class RecommenderModel(@transient sc:SparkContext,req:ServiceRequest) {
    */
   def recommend(site:String,user:String,total:Int):List[Preference] = {
     
-    val uid = users.getLookup(user)
+    val uid = users.field2index(user)
     
     val ratings = model.recommendProducts(uid, total)
     ratings.sortBy(-_.rating).map(x => Preference(site,user,x.product,x.rating)).toList
@@ -115,7 +115,7 @@ class RecommenderModel(@transient sc:SparkContext,req:ServiceRequest) {
    */  
   def recommend(site:String,item:Int,total:Int):List[Preference] = {
     val ratings = model.recommendProducts(item, total)
-    ratings.sortBy(-_.rating).map(x => Preference(site,users.getTerms(x.user),x.product,x.rating)).toList
+    ratings.sortBy(-_.rating).map(x => Preference(site,users.index2field(x.user),x.product,x.rating)).toList
   }
   
   /**
@@ -172,7 +172,7 @@ class Recommender(@transient sc:SparkContext) extends Serializable {
 
       val (site,user,iid,score) = x
       
-      val uid = busers.value.getLookup(user)
+      val uid = busers.value.field2index(user)
       Rating(uid,iid,score)
       
     })

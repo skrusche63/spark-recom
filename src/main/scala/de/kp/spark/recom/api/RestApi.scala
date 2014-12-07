@@ -438,12 +438,12 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient sc:SparkContext
            */
            ctx.complete(result.asInstanceOf[ScoredFields])
 
-        } else if (result.isInstanceOf[Similars]) {
+        } else if (result.isInstanceOf[SimilarFieldsList]) {
           /*
-           * This is the response type used for 'recommend'
+           * This is the response type used for 'similar'
            * requests that refer to the CAR algorithm
            */
-           ctx.complete(result.asInstanceOf[Similars])
+           ctx.complete(result.asInstanceOf[SimilarFieldsList])
         
         } else if (result.isInstanceOf[TargetedPoint]) {
           /*

@@ -148,8 +148,7 @@ class CARHandler(@transient sc:SparkContext) {
 
     val formatter = new CARFormatter(sc,req)
     
-    val topic = req.task.split(":")(1)
-    
+    val topic = req.task.split(":")(1)    
     val columns = if (topic == Topics.ITEM) {
       /*
        * This request recommends similar items to those that have 
@@ -177,11 +176,34 @@ class CARHandler(@transient sc:SparkContext) {
 
   def buildRecommendResponse(req:ServiceRequest,res:ServiceResponse):Any = {
 
-    val similars = Serializer.deserializeSimilars(req.data(Names.REQ_RESPONSE)).items
-
+    val similars = Serializer.deserializeSimilarColumnsList(req.data(Names.REQ_RESPONSE)).items
+    /*
+     * Reduce to the total number of scored columns
+     */
     val total = req.data(Names.REQ_TOTAL).toInt
-    ScoredFields(similars.flatMap(x => x.items).sortBy(x => -x.score).take(total))
+    val scoredColumns = similars.flatMap(x => x.items).sortBy(x => -x.score).take(total)
     
+    val formatter = new CARFormatter(sc,req)
+    
+    val topic = req.task.split(":")(1)    
+    if (topic == Topics.ITEM) {
+ 
+      val lookup = formatter.index2item
+      val offset = formatter.itemCount
+      
+      ScoredFields(scoredColumns.map(x => ScoredField(lookup(x.col-offset),x.score)))
+      
+      
+    } else if (topic == Topics.USER) {
+ 
+      val lookup = formatter.index2user
+      ScoredFields(scoredColumns.map(x => ScoredField(lookup(x.col),x.score)))
+      
+    } else {
+      throw new Exception("This request type is not supported by the CAR algorithm.")
+    }
+    
+    null
   }
 
   def buildSimilarRequest(req:ServiceRequest):String = {
@@ -207,7 +229,32 @@ class CARHandler(@transient sc:SparkContext) {
   }
   
   def buildSimilarResponse(req:ServiceRequest,res:ServiceResponse):Any = {
-    Serializer.deserializeSimilars(req.data(Names.REQ_RESPONSE))
+    
+    val similars = Serializer.deserializeSimilarColumnsList(req.data(Names.REQ_RESPONSE)).items
+    
+    val users = req.data.contains(Names.REQ_USERS)
+    val items = req.data.contains(Names.REQ_ITEMS)
+
+    val formatter = new CARFormatter(sc,req)
+    
+    if (users == false && items == false) {
+      new Exception("This similarity request is not supported by the CAR algorithm.")
+    }
+
+    if (users) {
+ 
+      val lookup = formatter.index2user
+      SimilarFieldsList(similars.map(x => SimilarFields(lookup(x.col),x.items.map(v => ScoredField(lookup(v.col),v.score)))))
+      
+    } else {
+ 
+      val lookup = formatter.index2item
+      val offset = formatter.itemCount
+
+      SimilarFieldsList(similars.map(x => SimilarFields(lookup(x.col-offset),x.items.map(v => ScoredField(lookup(v.col-offset),v.score)))))
+      
+    }
+   
   }
 
 }

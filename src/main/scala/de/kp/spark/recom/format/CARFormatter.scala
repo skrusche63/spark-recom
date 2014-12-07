@@ -33,8 +33,10 @@ class CARFormatter(@transient sc:SparkContext,req:ServiceRequest) extends Serial
   private val udict = Users.get(req)
 
   def userCount = udict.size
+  def index2user = udict.index2field
   
   def itemCount = idict.size
+  def index2item = idict.index2field
   
   def format:Array[Double] = {
     
@@ -64,7 +66,7 @@ class CARFormatter(@transient sc:SparkContext,req:ServiceRequest) extends Serial
     
     val block = Array.fill[Double](udict.size)(0.0)
     
-    val pos = udict.getLookup(uid)
+    val pos = udict.field2index(uid)
     block(pos) = 1
     
     block
@@ -79,7 +81,7 @@ class CARFormatter(@transient sc:SparkContext,req:ServiceRequest) extends Serial
     
     val block = Array.fill[Double](idict.size)(0.0)
     
-    val pos = idict.getLookup(iid)
+    val pos = idict.field2index(iid)
     block(pos) = 1
     
     block
@@ -90,7 +92,7 @@ class CARFormatter(@transient sc:SparkContext,req:ServiceRequest) extends Serial
   
   def itemsAsList:List[Int] = new EventSource(sc).activeItemsAsList(req, this)
   
-  def userAsCol(uid:String):Int = udict.getLookup(uid)
+  def userAsCol(uid:String):Int = udict.field2index(uid)
     
   /**
    * This method transforms a list of user identifiers into
@@ -103,7 +105,7 @@ class CARFormatter(@transient sc:SparkContext,req:ServiceRequest) extends Serial
     val users = req.data(Names.REQ_USERS).split(":")
     users.foreach(uid => {
  
-      val pos = udict.getLookup(uid)
+      val pos = udict.field2index(uid)
       block(pos) = 1
        
     })
@@ -122,7 +124,7 @@ class CARFormatter(@transient sc:SparkContext,req:ServiceRequest) extends Serial
     val items = req.data(Names.REQ_ITEMS).split(":")
     items.foreach(iid => {
  
-      val pos = idict.getLookup(iid)
+      val pos = idict.field2index(iid)
       block(pos) = 1
        
     })
@@ -137,7 +139,7 @@ class CARFormatter(@transient sc:SparkContext,req:ServiceRequest) extends Serial
     
     val block = Array.fill[Double](edict.size)(0.0)
     
-    val pos = edict.getLookup(event)
+    val pos = edict.field2index(event)
     block(pos) = 1
     
     block
@@ -156,7 +158,7 @@ class CARFormatter(@transient sc:SparkContext,req:ServiceRequest) extends Serial
     val block = Array.fill[Double](idict.size)(0.0)    
     val iid = req.data(Names.REQ_RELATED)
  
-    val pos = idict.getLookup(iid)
+    val pos = idict.field2index(iid)
     block(pos) = 1
     
     block

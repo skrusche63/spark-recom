@@ -49,11 +49,16 @@ case class PreferenceWithContext(
 
 case class Preferences(items:List[Preference])
 
+case class ScoredColumn(col:Int,score:Double)
+case class SimilarColumns(col:Int,items:List[ScoredColumn])
+
+case class SimilarColumnsList(items:List[SimilarColumns])
+
 case class ScoredField(name:String,score:Double)
 case class ScoredFields(items:List[ScoredField])
 
 case class SimilarFields(name:String,items:List[ScoredField])
-case class Similars(items:List[SimilarFields])
+case class SimilarFieldsList(items:List[SimilarFields])
 
 case class TargetedPoint(features:List[Double],target:Double)
 
@@ -121,8 +126,8 @@ object Serializer extends BaseSerializer {
    * Similars are the result of the CAR based recommendation
    * functionality
    */
-  def serializeSimilars(similars:Similars):String = write(similars) 
-  def deserializeSimilars(similars:String):Similars = read[Similars](similars)
+  def serializeSimilarColumnsList(similars:SimilarColumnsList):String = write(similars) 
+  def deserializeSimilarColumnsList(similars:String):SimilarColumnsList = read[SimilarColumnsList](similars)
   /*
    * TargetedPoint is the result of the CAR based prediction
    * functionality

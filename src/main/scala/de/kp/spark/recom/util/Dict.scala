@@ -26,8 +26,10 @@ class Dict extends Serializable {
    * Reference to the external data designators is used
    * to speed up data access
    */
-  private val terms  = Buffer.empty[String]
-  private val lookup = Map.empty[String,Int]
+  val terms  = Buffer.empty[String]
+
+  val field2index = Map.empty[String,Int]
+  val index2field = Map.empty[Int,String]
   
   /**
    * Build a dictionary from a distint sequence of terms 
@@ -35,19 +37,13 @@ class Dict extends Serializable {
   def build(seq:Seq[String]):Dict = {
   
     seq.map(entry => terms += entry)
-    seq.zipWithIndex.map(entry => lookup += entry._1 -> entry._2)
+    
+    seq.zipWithIndex.map(entry => field2index += entry._1 -> entry._2)
+    seq.zipWithIndex.map(entry => index2field += entry._2 -> entry._1)
     
     this
     
   }
-  /**
-   * Retrieve lookup data structure
-   */
-  def getLookup = lookup
-  /**
-   * Retrieve external data structure
-   */
-  def getTerms = terms
   
   def size = terms.size
   
