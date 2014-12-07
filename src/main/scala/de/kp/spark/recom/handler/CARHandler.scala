@@ -18,23 +18,25 @@ package de.kp.spark.recom.handler
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
+import org.apache.spark.SparkContext
+
 import de.kp.spark.core.Names
 import de.kp.spark.core.model._
 
-import de.kp.spark.recom.model.Serializer
+import de.kp.spark.recom.model._
 import de.kp.spark.recom.format.CARFormatter
 
-class CARHandler {
+class CARHandler(@transient sc:SparkContext) {
 
   /**
    * This method builds a feature vector from the request parameter that can
    * be sent to the Context-Aware Analysis engine. A feature vector is usually
    * used with 'predict' requests
    */
-  def buildFeatureReq(req:ServiceRequest):String = {
+  def buildPredictRequest(req:ServiceRequest):String = {
 
     val service = "context"
-    val task = "get:feature"
+    val task = "predict:feature"
     
     if (req.data.contains(Names.REQ_FEATURES)) {
       /*
@@ -64,21 +66,148 @@ class CARHandler {
       throw new Exception(msg)      
     }
 
-    if (req.data.contains(Names.REQ_CONTEXT) == false) {      
-      val msg = String.format("""[UID %s] No 'context' parameter provided.""",uid)
+    if (req.data.contains(Names.REQ_EVENT) == false) {      
+      val msg = String.format("""[UID %s] No 'event' parameter provided.""",uid)
       throw new Exception(msg)      
     }
+
+    if (req.data.contains(Names.REQ_DAY_OF_WEEK) == false) {      
+      val msg = String.format("""[UID %s] No 'day of week' parameter provided.""",uid)
+      throw new Exception(msg)      
+    }
+ 
+    if (req.data.contains(Names.REQ_HOUR_OF_DAY) == false) {      
+      val msg = String.format("""[UID %s] No 'hour of day' parameter provided.""",uid)
+      throw new Exception(msg)      
+    }
+ 
+    /*
+     * In the training phase, the related item is the one that was rated just
+     * before the active item was rated; in the context of a 'predict' request,
+     * we have to generalize this interpretation and consider this second item
+     * as one, that has some temporal relation to the active one 
+     */
+    if (req.data.contains(Names.REQ_RELATED) == false) {      
+      val msg = String.format("""[UID %s] No 'related item' parameter provided.""",uid)
+      throw new Exception(msg)      
+    }
+   
+    val features = new CARFormatter(sc,req).format.mkString(",")
     
-    val features = new CARFormatter().format(req).mkString(",")
-    
-    /* Update request parameters */
-    val filter = List(Names.REQ_USER,Names.REQ_ITEM)
-    val data = req.data.filter(x => filter.contains(x._1) == false).map(x => {
-      if (x._1 == Names.REQ_CONTEXT) (Names.REQ_FEATURES,features) else x
-    })
-      
+    val data = Map(Names.REQ_FEATURES -> features) ++ req.data     
     return Serializer.serializeRequest(new ServiceRequest(service,task,data))
 
+  }
+
+  def buildPredictResponse(req:ServiceRequest,res:ServiceResponse):Any = {
+    
+    val target = res.data(Names.REQ_RESPONSE).toDouble
+    /*
+     * We distinguish between two different requests types: one request provides
+     * a completely specified feature vector, and, the other request type comes
+     * with event oriented input information and must be transformed into a 
+     * feature vector. 
+     */
+    val filter = List(Names.REQ_USER,Names.REQ_ITEM,Names.REQ_EVENT,Names.REQ_DAY_OF_WEEK,Names.REQ_HOUR_OF_DAY,Names.REQ_RELATED)
+    val context = req.data.filter(kv => filter.contains(kv._1))
+    
+    if (context.size == filter.size) {
+      
+      PreferenceWithContext(
+        /* User & item part */
+        req.data(Names.REQ_SITE),
+        req.data(Names.REQ_USER),
+        req.data(Names.REQ_ITEM),
+        /* Context specific information */ 
+        req.data(Names.REQ_EVENT),
+        req.data(Names.REQ_DAY_OF_WEEK).toInt,
+        req.data(Names.REQ_HOUR_OF_DAY).toInt,
+        req.data(Names.REQ_RELATED),
+        target)
+      
+    } else if (req.data.contains(Names.REQ_FEATURES)) {
+      
+      val features = req.data(Names.REQ_FEATURES).split(",").map(_.toDouble).toList    
+      TargetedPoint(features,target)
+    
+    } else {
+      throw new Exception("This request type is not supported by the CAR algorithm.")
+    }
+  
+  }
+  /**
+   * A CAR based recommendation request determines those items that are similar
+   * to the active items of a certain user; different from the similarity request,
+   * the result of the Context-Aware Analysis engine is transformed into a list
+   * of scored fields.
+   */
+  def buildRecommendRequest(req:ServiceRequest):String = {
+
+    val service = "context"
+    val task = "similar:feature"
+
+    val formatter = new CARFormatter(sc,req)
+    
+    val topic = req.task.split(":")(1)
+    
+    val columns = if (topic == Topics.ITEM) {
+      /*
+       * This request recommends similar items to those that have 
+       * been voted by a specified 'user'
+       */
+      formatter.itemsAsList.mkString(",")
+      
+    } else if (topic == Topics.USER) {
+      /*
+       * This request recommends similar users to those that have 
+       * been voted for a specified 'item'
+       */
+      formatter.usersAsList.mkString(",")
+      
+    } else {
+      throw new Exception("This request type is not supported by the CAR algorithm.")
+    }
+      
+    val excludes = List(Names.REQ_COLUMNS)
+    val data = Map(Names.REQ_COLUMNS -> columns) ++  req.data.filter(kv => excludes.contains(kv._1) == false)  
+
+    return Serializer.serializeRequest(new ServiceRequest(service,task,data))
+
+  }
+
+  def buildRecommendResponse(req:ServiceRequest,res:ServiceResponse):Any = {
+
+    val similars = Serializer.deserializeSimilars(req.data(Names.REQ_RESPONSE)).items
+
+    val total = req.data(Names.REQ_TOTAL).toInt
+    ScoredFields(similars.flatMap(x => x.items).sortBy(x => -x.score).take(total))
+    
+  }
+
+  def buildSimilarRequest(req:ServiceRequest):String = {
+
+    val service = "context"
+    val task = "similar:feature"
+    
+    val users = req.data.contains(Names.REQ_USERS)
+    val items = req.data.contains(Names.REQ_ITEMS)
+    
+    if (users == false && items == false) {
+      new Exception("This similarity request is not supported by the CAR algorithm.")
+    }
+    
+    val formatter = new CARFormatter(sc,req)
+    val columns = if (users) formatter.usersAsCols.mkString(",") else formatter.itemsAsCols.mkString(",")
+      
+    val excludes = List(Names.REQ_COLUMNS)
+    val data = Map(Names.REQ_COLUMNS -> columns) ++  req.data.filter(kv => excludes.contains(kv._1) == false)  
+
+    return Serializer.serializeRequest(new ServiceRequest(service,task,data))
+    
+  }
+  
+  def buildSimilarResponse(req:ServiceRequest,res:ServiceResponse):Any = {
+    Serializer.deserializeSimilars(req.data(Names.REQ_RESPONSE))
   }
 
 }

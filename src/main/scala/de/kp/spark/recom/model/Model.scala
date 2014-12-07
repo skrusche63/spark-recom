@@ -28,8 +28,26 @@ import de.kp.spark.core.model._
 case class Preference(
   site:String,user:String,item:Int,score:Double
 )
+/**
+ * This information element is used by the CAR algorithm to
+ * specify the result of a prediction request 
+ */
+case class PreferenceWithContext(
+  site:String,
+  user:String,
+  item:String,
+  /*
+   * The fields 'event', 'dayOfweek', 'hourOfday' and 'related' 
+   * specify the context for a certain prediction request
+   */
+  event:String,
+  dayOfweek:Int,
+  hourOfday:Int,
+  related:String,
+  score:Double
+)
 
-case class Preferences(preferences:List[Preference])
+case class Preferences(items:List[Preference])
 
 case class ScoredField(name:String,score:Double)
 case class ScoredFields(items:List[ScoredField])
@@ -151,13 +169,21 @@ object Sources {
 }
 
 object Topics {
-
-  val EVENT:String   = "event" 
-  val ITEM:String    = "item"
-  val SIMILAR:String = "similar"
+  /*
+   * 'event' & 'item' specify the data source type a certain
+   * recommender request is based on; these topics are used
+   * for almost all requests
+   */
+  val EVENT:String = "event" 
+  val ITEM:String  = "item"
+  /*
+   * 'feature' is the topic, that is used by the Context-Aware
+   * Analysis engine to describe the result of 
+   */
+  val FEATURE:String = "feature"
   val USER:String    = "user" 
     
-  private val topics = List(EVENT,ITEM,SIMILAR,USER)
+  private val topics = List(EVENT,FEATURE,ITEM,USER)
   
   def isTopic(topic:String):Boolean = topics.contains(topic)
   

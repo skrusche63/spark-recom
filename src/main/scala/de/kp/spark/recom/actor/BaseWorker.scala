@@ -38,8 +38,8 @@ abstract class BaseWorker(@transient sc:SparkContext) extends BaseActor {
       val uid = req.data(Names.REQ_UID)
 
       try {
-      
-        req. task.split(":")(0) match {
+        val Array(task,topic) = req.task.split(":")
+        task match {
       
           /*
            * A 'build' requests initiates the build of a recommender model;
@@ -89,11 +89,6 @@ abstract class BaseWorker(@transient sc:SparkContext) extends BaseActor {
           
           }
         
-          /*
-           * A 'predict' request retrieves a rating for a certain dataset
-           * provided with this request; the format of the dataset depends
-           * on the algorithm specified 
-           */
           case "recommend" => {
 
             val missing = missingRecommendParams(req)
@@ -107,6 +102,36 @@ abstract class BaseWorker(@transient sc:SparkContext) extends BaseActor {
                 case result => {
                   val intermediate = Serializer.deserializeResponse(result)
                   origin ! buildRecommendResponse(req,intermediate)
+                }
+
+              }
+              response.onFailure {
+                case throwable => origin ! failure(req,throwable.getMessage)	 	      
+	          }
+         
+            }
+      
+            context.stop(self)
+          
+          }
+         
+          /*
+           * A 'similar' request retrieves items that are similar to a set
+           * of items provided with this request
+           */
+          case "similar" => {
+
+            val missing = missingSimilarParams(req)
+            origin ! response(req, missing)
+
+            if (missing == false) {
+
+              val response = doSimilarRequest(req).mapTo[String]
+              response.onSuccess {
+        
+                case result => {
+                  val intermediate = Serializer.deserializeResponse(result)
+                  origin ! buildSimilarResponse(req,intermediate)
                 }
 
               }
@@ -190,6 +215,14 @@ abstract class BaseWorker(@transient sc:SparkContext) extends BaseActor {
   protected def doRecommendRequest(req:ServiceRequest):Future[Any]
 
   protected def buildRecommendResponse(request:ServiceRequest, intermediate:ServiceResponse):Any
+  /**
+   * Methods to support SIMILAR requests
+   */
+  protected def missingSimilarParams(req:ServiceRequest):Boolean = false
+
+  protected def doSimilarRequest(req:ServiceRequest):Future[Any]
+
+  protected def buildSimilarResponse(request:ServiceRequest, intermediate:ServiceResponse):Any
   /**
    * Methods to support TRAIN requests
    */

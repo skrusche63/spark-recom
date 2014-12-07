@@ -38,14 +38,16 @@ import scala.collection.mutable.ArrayBuffer
  * Analysis engine to build recommendations from association rules
  */
 class ASRActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(sc) {
-  /**
+
+  private val service = "association"    
+  
+    /**
    * Recommendations based on association rules do not need to
    * build user preferences first; therefore, the request is
    * delegated to mining the respective association rules
    */
   def doBuildRequest(req:ServiceRequest) {
 
-    val service = "association"    
     /*
      * The 'algorithm' parameter is specified as 'ASR'; the respective Association
      * Analysis engine, however, distinguishes between 'TOPK' and 'TOPKNR' algorithms.
@@ -65,7 +67,6 @@ class ASRActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
    */
   def doTrainRequest(req:ServiceRequest) {
       
-    val service = req.service
     val message = Serializer.serializeRequest(req)
     /*
      * Mining association rules is a fire-and-forget task
@@ -89,9 +90,7 @@ class ASRActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
    */
   def doRecommendRequest(req:ServiceRequest):Future[Any] = {
 
-    val service = "association"
-    val message = Serializer.serializeRequest(new ServiceRequest(service,"get:recommendation",req.data))
-    
+    val message = Serializer.serializeRequest(new ServiceRequest(service,"get:transaction",req.data))
     rtx.send(service,message)
     
   }
@@ -108,7 +107,7 @@ class ASRActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
        */
       val total = req.data(Names.REQ_TOTAL).toInt
     
-      val rules = Serializer.deserializeMultiUserRules(req.data("recommendation")).items
+      val rules = Serializer.deserializeMultiUserRules(req.data(Names.REQ_RESPONSE)).items
       val preferences = rules.filter(x => x.site == site && users.contains(x.user)).flatMap(entry => {
               
         val (site,user) = (entry.site,entry.user)
@@ -134,6 +133,14 @@ class ASRActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
     }    
     
   }
+  /**
+   * Similar requests are not supported for association rules
+   */
+  def doSimilarRequest(req:ServiceRequest):Future[Any] = {
+    throw new Exception("Similar requests are not suported for the ASR algorithm.")
+  }
+  
+  def buildSimilarResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = null
   
   /**
    * This private method returns preferences from a list of weighted association 

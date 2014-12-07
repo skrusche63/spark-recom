@@ -20,6 +20,8 @@ package de.kp.spark.recom.actor
 
 import akka.actor.{Actor,ActorLogging,ActorRef}
 
+import de.kp.spark.core.Names
+
 import de.kp.spark.core.model._
 import de.kp.spark.core.redis.RedisCache
 
@@ -38,32 +40,12 @@ abstract class BaseActor extends Actor with ActorLogging {
   protected def failure(req:ServiceRequest,message:String):ServiceResponse = {
     
     if (req == null) {
-      val data = Map("message" -> message)
+      val data = Map(Names.REQ_MESSAGE -> message)
       new ServiceResponse("","",data,ResponseStatus.FAILURE)	
       
     } else {
-      val data = Map("uid" -> req.data("uid"), "message" -> message)
+      val data = Map(Names.REQ_UID -> req.data(Names.REQ_UID), Names.REQ_MESSAGE -> message)
       new ServiceResponse(req.service,req.task,data,ResponseStatus.FAILURE)	
-    
-    }
-    
-  }
-  
-  protected def onResponse(request:ServiceRequest,response:Future[ServiceResponse],receiver:ActorRef) {
-    
-    response.onSuccess {
-      case result => {
-        receiver ! result
-        context.stop(self)
-      }
-    }
-
-    response.onFailure {
-      case throwable => {           
-        receiver ! failure(request,throwable.toString)	                  
-        context.stop(self)
-              
-      }	  
     
     }
     
@@ -71,14 +53,14 @@ abstract class BaseActor extends Actor with ActorLogging {
   
   protected def response(req:ServiceRequest,missing:Boolean):ServiceResponse = {
     
-    val uid = req.data("uid")
+    val uid = req.data(Names.REQ_UID)
     
     if (missing == true) {
-      val data = Map("uid" -> uid, "message" -> Messages.MISSING_PARAMETERS(uid))
+      val data = Map(Names.REQ_UID -> uid, Names.REQ_MESSAGE -> Messages.MISSING_PARAMETERS(uid))
       new ServiceResponse(req.service,req.task,data,ResponseStatus.FAILURE)	
   
     } else {
-      val data = Map("uid" -> uid, "message" -> Messages.MODEL_BUILDING_STARTED(uid))
+      val data = Map(Names.REQ_UID -> uid, Names.REQ_MESSAGE -> Messages.MODEL_BUILDING_STARTED(uid))
       new ServiceResponse(req.service,req.task,data,ResponseStatus.BUILDING_STARTED)	
   
     }
@@ -110,47 +92,6 @@ abstract class BaseActor extends Actor with ActorLogging {
       Serializer.serializeResponse(resp.asInstanceOf[ServiceResponse])
             
     }
-    
-  }
-  
-  protected def validate(req:ServiceRequest):Option[String] = {
-
-    val uid = req.data("uid")
-    
-    if (cache.statusExists(req)) {            
-      return Some(Messages.TASK_ALREADY_STARTED(uid))   
-    }
-
-    req.data.get("algorithm") match {
-        
-      case None => {
-        return Some(Messages.NO_ALGORITHM_PROVIDED(uid))              
-      }
-        
-      case Some(algorithm) => {
-        if (Algorithms.isAlgorithm(algorithm) == false) {
-          return Some(Messages.ALGORITHM_IS_UNKNOWN(uid,algorithm))    
-        }
-          
-      }
-    
-    }  
-    
-    req.data.get("source") match {
-        
-      case None => {
-        return Some(Messages.NO_SOURCE_PROVIDED(uid))       
-      }
-        
-      case Some(source) => {
-        if (Sources.isSource(source) == false) {
-          return Some(Messages.SOURCE_IS_UNKNOWN(uid,source))    
-        }          
-      }
-        
-    }
-
-    None
     
   }
 

@@ -31,104 +31,217 @@ import de.kp.spark.core.model._
 import de.kp.spark.recom.Configuration
 import de.kp.spark.recom.model._
 
-import de.kp.spark.recom.util.{Users,Items}
+import de.kp.spark.recom.format.CARFormatter
 
 class EventSource(@transient sc:SparkContext) {
 
   val (host,port) = Configuration.redis
   val cache = new RedisCache(host,port.toInt)
+  
   /**
-   * The method retrieves the list of items that have been rated by a certain user and 
+   * This method retrieves the 'rated items' block of a certain user from the computed
+   * preferences or ratings. The 'rated item block' is the same for each active item of
+   * the user. Therefore, only the first user record is taken into account.
+   * 
+   * The result is used to specify a feature vector from event orient input information.
+   */
+  def ratedItemsAsCols(req:ServiceRequest,formatter:CARFormatter):Array[Double] = {
+    
+    val user = req.data(Names.REQ_USER)
+    
+    val path = Configuration.file(0)
+    val rawset = new FileSource(sc).connect(path,req)
+    
+    val busr = sc.broadcast(formatter.userAsCol(user))      
+    val head = rawset.filter(line => {
+        
+      val Array(target,point) = line.split(",")
+      val features = point.split(" ").map(_.toDouble)
+      
+      features(busr.value) == 1.toDouble
+    
+    }).take(1)(0)
+    
+    val Array(target,point) = head.split(",")
+    
+    /*
+     * Determine start & end position for the rated item block
+     */
+    val userCount = formatter.userCount
+    val itemCount = formatter.itemCount
+    
+    val start = userCount + itemCount
+    val end = start + itemCount - 1
+   
+    point.split(" ").map(_.toDouble).slice(start,end)
+    
+  }
+  
+  def activeUsersAsList(req:ServiceRequest,formatter:CARFormatter):List[Int] = {
+
+    val (item,context) = itemFieldsAsCols(req)
+    
+    val path = Configuration.file(0)
+    val rawset = new FileSource(sc).connect(path,req)
+      
+    val bitm = sc.broadcast(item)
+    val bctx = sc.broadcast(context)
+    /*
+     * We restrict to those lines in the dataset that refer to the provided
+     * item and further restrict to those that match the provided context
+     */
+    val filtered = rawset.filter(line => {
+        
+      val Array(target,point) = line.split(",")
+      val features = point.split(" ").map(_.toDouble)
+        
+      val itm = bitm.value
+      val ctx = bctx.value
+        
+      val is_item = features(itm) == 1.toDouble
+      val has_ctx = (ctx.isEmpty == false) && ctx.map(kv => if (features(kv._1) == kv._2) 0 else 1).max == 0
+        
+      is_item && has_ctx
+        
+    })
+    
+    /*
+     * Determine start and end point of user block 
+     */
+    val start = 0
+    val end   = start + formatter.userCount - 1
+      
+    val bs = sc.broadcast(start)
+    val be = sc.broadcast(end)
+      
+    filtered.map(line => {
+        
+      val Array(target,point) = line.split(",")
+      /* 
+       * Slice users from feature vector; as this is a binary representation
+       * each sliced array has a single column that is different from '0' 
+       */
+      val users = point.split(" ").map(_.toDouble).slice(bs.value,be.value)
+      /*
+       * Determine the column position by using the start point
+       * of the user block as an offset for the sliced array
+       */
+      bs.value + users.indexOf(1.toDouble)
+        
+    }).collect().toList.distinct
+  
+  }
+  
+  /**
+   * The method retrieves the list of active items that have been rated by a certain user and 
    * uses the additional context information for filtering; the respective items are 
    * specified by their column positions in the feature representation of an event.
    */
-  def getItemsByCol(req:ServiceRequest):List[Int] = {
-    
-    val algorithm = req.data(Names.REQ_ALGORITHM)
-    if (algorithm == Algorithms.CAR) {
-    
-      val path = Configuration.file(0)
-      val rawset = new FileSource(sc).connect(path,req)
+  def activeItemsAsList(req:ServiceRequest,formatter:CARFormatter):List[Int] = {
 
-      val (user,context) = columns(req)
-      
-      val busr = sc.broadcast(user)
-      val bctx  = sc.broadcast(context)
-      /*
-       * We restrict to those lines in the dataset that refer to the
-       * provided and further restrict to those that match the provided
-       * context and values
-       */
-      val filtered = rawset.filter(line => {
-        
-        val Array(target,point) = line.split(":")
-        val features = point.split(":").map(_.toDouble)
-        
-        val usr = busr.value
-        val ctx = bctx.value
-        
-        val is_user = features(usr) == 1.toDouble
-        val has_ctx = (ctx.isEmpty == false) && ctx.map(kv => if (features(kv._1) == kv._2) 0 else 1).max == 0
-        
-        is_user && has_ctx
-        
-      })
-      
-      /*
-       * Determine start and end point of item block 
-       */
-      val start = Users.get(req).size
-      val end   = start + Items.get(req).size - 1
-      
-      val bs = sc.broadcast(start)
-      val be   = sc.broadcast(end)
-      
-      filtered.map(line => {
-        
-        val Array(target,point) = line.split(":")
-        /* 
-         * Slice items from feature vector; as this is a binary representation
-         * each sliced array has a single column that is different from '0' 
-         */
-        val items = point.split(":").map(_.toDouble).slice(bs.value,be.value)
-        /*
-         * Determine the column position by using the start point
-         * of the item block as an offset for the sliced array
-         */
-        bs.value + items.indexOf(1.toDouble)
-        
-      }).collect().toList
-      
-    } else {
-      throw new Exception("Recommending items for an event data source is restricted to the CAR algorithm.")
+    val (user,context) = userFieldsAsCols(req)
     
-    }
+    val path = Configuration.file(0)
+    val rawset = new FileSource(sc).connect(path,req)
+      
+    val busr = sc.broadcast(user)
+    val bctx = sc.broadcast(context)
+    /*
+     * We restrict to those lines in the dataset that refer to the provided
+     * user and further restrict to those that match the provided context
+     */
+    val filtered = rawset.filter(line => {
+        
+      val Array(target,point) = line.split(",")
+      val features = point.split(" ").map(_.toDouble)
+        
+      val usr = busr.value
+      val ctx = bctx.value
+        
+      val is_user = features(usr) == 1.toDouble
+      val has_ctx = (ctx.isEmpty == false) && ctx.map(kv => if (features(kv._1) == kv._2) 0 else 1).max == 0
+        
+      is_user && has_ctx
+        
+    })
+      
+    /*
+     * Determine start and end point of item block 
+     */
+    val start = formatter.userCount
+    val end   = start + formatter.itemCount - 1
+      
+    val bs = sc.broadcast(start)
+    val be = sc.broadcast(end)
+      
+    filtered.map(line => {
+        
+      val Array(target,point) = line.split(",")
+      /* 
+       * Slice items from feature vector; as this is a binary representation
+       * each sliced array has a single column that is different from '0' 
+       */
+      val items = point.split(" ").map(_.toDouble).slice(bs.value,be.value)
+      /*
+       * Determine the column position by using the start point
+       * of the item block as an offset for the sliced array
+       */
+      bs.value + items.indexOf(1.toDouble)
+        
+    }).collect().toList.distinct
 
   }
   
   /**
    * Private method to determine the column positions of the provided 
-   * user name and context column name
+   * user & context fields
    */
-  private def columns(req:ServiceRequest):(Int,List[(Int,Double)]) = {
+  private def userFieldsAsCols(req:ServiceRequest):(Int,List[(Int,Double)]) = {
     
     val user =  req.data(Names.REQ_USER)
-    /* context is a key-value data structure of the form k,v;k,v; */
-    val context = if (req.data.contains(Names.REQ_CONTEXT)) req.data(Names.REQ_CONTEXT).split(";").toList else List.empty[String]
 
     val fields = cache.fields(req)   
     val lookup = fields.zipWithIndex.map(x => (x._1.name,x._2)).toMap
     
     val uid = lookup(user)
-    val cid = context.map(kv => {
+    val cid = context(req).map(kv => {
       
-      val Array(name,value) = kv.split(",")
+      val (name,value) = kv
       (lookup(name),value.toDouble)
     
-    })
+    }).toList
     
     (uid,cid)
     
+  }
+  /**
+   * Private method to determine the column positions of the provided 
+   * item & context fields
+   */
+  private def itemFieldsAsCols(req:ServiceRequest):(Int,List[(Int,Double)]) = {
+    
+    val item =  req.data(Names.REQ_ITEM)
+
+    val fields = cache.fields(req)   
+    val lookup = fields.zipWithIndex.map(x => (x._1.name,x._2)).toMap
+    
+    val iid = lookup(item)
+    val cid = context(req).map(kv => {
+      
+      val (name,value) = kv
+      (lookup(name),value.toDouble)
+    
+    }).toList
+    
+    (iid,cid)
+    
+  }
+  
+  private def context(req:ServiceRequest):Map[String,String] = {
+    
+    val filter = List(Names.REQ_EVENT,Names.REQ_DAY_OF_WEEK,Names.REQ_HOUR_OF_DAY,Names.REQ_RELATED)
+    req.data.filter(kv => filter.contains(kv._1))
+
   }
   
 }

@@ -35,28 +35,48 @@ import de.kp.spark.recom.RemoteContext
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-
 /**
- * BuildActor is responsible for build implict user ratings from the 
- * data source provided; this is either an event- or item-based source.
+ * The Distributor actor is responsible for distributing service requests
+ * with respect to the algorithm provided by the request
  */
-class BuildActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseActor {
+class Distributor(@transient sc:SparkContext,rc:RemoteContext) extends BaseActor {
   
   def receive = {
 
     case req:ServiceRequest => {
       
-      val origin = sender    
-      val uid = req.data(Names.REQ_UID)
-          
-      val response = validate(req) match {
+      val origin = sender              
+      val response = try {
+        
+        validate(req) match {
             
-        case None => build(req).mapTo[ServiceResponse]            
-        case Some(message) => Future {failure(req,message)}
+          case None => execute(req)             
+          case Some(message) => Future {failure(req,message)}
             
+        }        
+                   
+      
+      } catch {
+        case e:Exception => Future {failure(req,e.getMessage)}
+        
       }
-
-      onResponse(req,response,origin)
+      
+      response.onSuccess {
+        
+        case result => {
+          origin ! result
+          context.stop(self)
+        }
+      
+      }
+      response.onFailure {
+      
+        case throwable => {           
+          origin ! failure(req,throwable.toString)	                  
+          context.stop(self)            
+        }	      
+      
+      }
          
     }
     
@@ -72,14 +92,14 @@ class BuildActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseActor
   
   }
  
-  private def actor(req:ServiceRequest):ActorRef = {
+  protected def actor(req:ServiceRequest):ActorRef = {
 
     req.data(Names.REQ_ALGORITHM) match {
       
-      case Algorithms.ALS => context.actorOf(Props(new ALSActor(sc,rtx)))   
+      case Algorithms.ALS => context.actorOf(Props(new ALSActor(sc,rc)))   
       
-      case Algorithms.ASR => context.actorOf(Props(new ASRActor(sc,rtx)))   
-      case Algorithms.CAR => context.actorOf(Props(new CARActor(sc,rtx)))   
+      case Algorithms.ASR => context.actorOf(Props(new ASRActor(sc,rc)))   
+      case Algorithms.CAR => context.actorOf(Props(new CARActor(sc,rc)))   
 
       case _ => null
       
@@ -87,7 +107,7 @@ class BuildActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseActor
   
   }
  
-  private def build(req:ServiceRequest):Future[Any] = {
+  protected def execute(req:ServiceRequest):Future[Any] = {
 
     val (duration,retries,time) = Configuration.actor      
     implicit val timeout:Timeout = DurationInt(time).second
@@ -96,25 +116,30 @@ class BuildActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseActor
     
   }
   
-  override def validate(req:ServiceRequest):Option[String] = {
+  protected def validate(req:ServiceRequest):Option[String] = {
 
-    /**
-     * We have to make sure that there is a sink specified, and,
-     * that the respective sink is set to FILE; this ensures that
-     * the ratings are saved as file on a Hadoop file system 
-     */
     val uid = req.data(Names.REQ_UID)
-    if (req.data.contains(Names.REQ_SINK) == false) {
-      return Some(Messages.NO_SINK_PROVIDED(uid))    
-      
-    }
     
-    if (req.data(Names.REQ_SINK) != Sinks.FILE) {
-      return Some(Messages.FILE_SINK_REQUIRED(uid))          
+    if (cache.statusExists(req)) {            
+      return Some(Messages.TASK_ALREADY_STARTED(uid))   
     }
+
+    req.data.get(Names.REQ_ALGORITHM) match {
+        
+      case None => {
+        return Some(Messages.NO_ALGORITHM_PROVIDED(uid))              
+      }
+        
+      case Some(algorithm) => {
+        if (Algorithms.isAlgorithm(algorithm) == false) {
+          return Some(Messages.ALGORITHM_IS_UNKNOWN(uid,algorithm))    
+        }
+          
+      }
     
-    super.validate(req)
-   
+    }  
+
+    None
     
   }
 

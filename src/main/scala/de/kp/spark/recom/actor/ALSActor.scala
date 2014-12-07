@@ -129,7 +129,7 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
       /*
        * Send the list of prefences back to the requestor
        */
-      Serializer.deserializePreferences(intermediate.data("recommendation"))
+      Serializer.deserializePreferences(intermediate.data(Names.REQ_RESPONSE))
       
     } else {
       /*
@@ -199,7 +199,7 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
       /*
        * Send the list of prefences back to the requestor
        */
-      Serializer.deserializePreferences(intermediate.data("recommendation"))
+      Serializer.deserializePreferences(intermediate.data(Names.REQ_RESPONSE))
       
     } else {
       /*
@@ -211,6 +211,14 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
     }
     
   }
+  /**
+   * Similar requests are not supported for matrix factorization
+   */
+  def doSimilarRequest(req:ServiceRequest):Future[Any] = {
+    throw new Exception("Similar requests are not suported for the ALS algorithm.")
+  }
+  
+  def buildSimilarResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = null
   
   /**
    * In order to be compliant with the functionality of the ASR and CAR actor, 
@@ -218,7 +226,7 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
    */   
   private def serialize(uid:String,preferences:Preferences):String = {
      
-    val data = Map(Names.REQ_UID -> uid,"recommendation" -> Serializer.serializePreferences(preferences))
+    val data = Map(Names.REQ_UID -> uid,Names.REQ_RESPONSE -> Serializer.serializePreferences(preferences))
     val response = ServiceResponse("","",data,ResponseStatus.SUCCESS)
       
     Serializer.serializeResponse(response)

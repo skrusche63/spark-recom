@@ -33,20 +33,22 @@ import de.kp.spark.recom.source.EventSource
 import scala.concurrent.Future
 
 class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(sc) {
+  
+  private val service = "context"
+
   /**
    * The user rating is built by delegating the request to the 
    * remote rating service; this Akka service represents the 
    * User Preference engine of Predictiveworks.
    */
   def doBuildRequest(req:ServiceRequest) {
-      
-    val service = req.service
-    val message = Serializer.serializeRequest(req)
+
     /*
      * Building user rating is a fire-and-forget task
      * from the recommendation service prespective
      */
-    rtx.send(service,message)
+    val message = Serializer.serializeRequest(req)
+    rtx.send(req.service,message)
     
   }
   /**
@@ -63,22 +65,19 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
     if (source != Sources.FILE)
       throw new Exception("The CAR algorithm actually only supports file-based data sources.")
     
-    val service = "context"
-    val message = Serializer.serializeRequest(new ServiceRequest(service,req.task,req.data))
     /*
      * Training a factorization model or a correlation matrix is a fire-and-forget 
      * task from the recommendation service prespective; the request task is either
      * specified as 'train:matrix' or 'train:model'
      */
+    val message = Serializer.serializeRequest(new ServiceRequest(service,req.task,req.data))
     rtx.send(service,message)
     
   }
 
   def doPredictRequest(req:ServiceRequest):Future[Any] = {
 
-    val message = new CARHandler().buildFeatureReq(req)
-
-    val service = "context"
+    val message = new CARHandler(sc).buildPredictRequest(req)
     rtx.send(service,message)
      
   }
@@ -86,11 +85,7 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
   def buildPredictResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = {
     
     if (intermediate.status == ResponseStatus.SUCCESS) {
-
-      val features = req.data("features").split(",").map(_.toDouble).toList
-      val target   = intermediate.data("feature").toDouble
-    
-      TargetedPoint(features,target)
+      new CARHandler(sc).buildPredictResponse(req,intermediate)
      
     } else {
       /*
@@ -102,63 +97,35 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
     }    
 
   }
-
+  /**
+   * A CAR based recommendation request supports two different use cases:
+   * 
+   * 1) a certain user is provided and those items are determined that are 
+   * similar to the active items; different from the similarity request, the 
+   * result of the Context-Aware Analysis engine is transformed into a list 
+   * of scored fields.
+   * 
+   * This request requires the existence of an item-based correlation matrix
+   * 
+   * 2) a certain item is provided and those users are determined that are similar
+   * to those that have voted for this item; different from the similarity request, 
+   * the result of the Context-Aware Analysis engine is transformed into a list 
+   * of scored fields.
+   * 
+   * This request requires the existence of an user-based correlation matrix
+   * 
+   */
   def doRecommendRequest(req:ServiceRequest):Future[Any] = {
     
-    val topic = req.task.split(":")(1)
-    topic match {
-      
-      case Topics.ITEM => {
-        
-        val columns = new EventSource(sc).getItemsByCol(req).mkString(",")
-        
-        val filter = List(Names.REQ_USER,Names.REQ_CONTEXT)
-        val data = Map(Names.REQ_COLUMNS -> columns) ++ req.data.filter(kv => filter.contains(kv._1) == false)
-        
-        val service = "context"
-        val message = Serializer.serializeRequest(new ServiceRequest(service,"get:item",req.data))
-    
-        rtx.send(service,message)
-        
-      }
-      
-      case Topics.SIMILAR => {
-        /*
-         * This request determines for each item in a list those items that are most
-         * similar; the number of items must be restricted by a request parameter
-         */
-        val service = "context"
-        val message = Serializer.serializeRequest(new ServiceRequest(service,"get:similar",req.data))
-    
-        rtx.send(service,message)
-        
-      }
-      
-      case _ =>  throw new Exception("This recommendation request is not supported by the CAR algorithm.")
-
-    }
+    val message = new CARHandler(sc).buildRecommendRequest(req)
+    rtx.send(service,message)
     
   }
 
   def buildRecommendResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = {
     
     if (intermediate.status == ResponseStatus.SUCCESS) {
-
-      if (req.data.contains(Topics.ITEM)) {
-        /*
-         * This response describes the top most similar items with 
-         * respect to the a user's list of rated items 
-         */
-        Serializer.deserializeScoredFields(req.data(Topics.ITEM))
-      
-      } else if (req.data.contains(Topics.SIMILAR)) {
-        /*
-         * This response describes the top most similar items with 
-         * respect to list of items
-         */
-        Serializer.deserializeSimilars(req.data(Topics.SIMILAR))
-        
-      } else throw new Exception("The recommendation response is not supported by the CAR algorithm.")
+      new CARHandler(sc).buildRecommendResponse(req,intermediate)
       
     } else {
       /*
@@ -169,6 +136,33 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
 
     }
   
+  }
+
+  /*
+   * This request determines for each item in a list those items that are most
+   * similar; the number of items must be restricted by a request parameter
+   */
+  def doSimilarRequest(req:ServiceRequest):Future[Any] = {
+    
+    val message = new CARHandler(sc).buildSimilarRequest(req)
+    rtx.send(service,message)
+        
+  }
+  
+  def buildSimilarResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = {
+    
+    if (intermediate.status == ResponseStatus.SUCCESS) {
+      new CARHandler(sc).buildSimilarResponse(req,intermediate)
+      
+    } else {
+      /*
+       * In case of an error, send the intermediate message as it contains
+       * the specification of the respective failure
+       */
+      intermediate
+
+    }
+    
   }
 
 }

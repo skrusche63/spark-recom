@@ -59,37 +59,34 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient sc:SparkContext
 
   private def routes:Route = {
     /**
-     * The 'admin' request type distinguishes between 
-     * 
-     * a) /admin/fields 
-     * 
-     * This request retrieve the field specification that has been registered
-     * for a certain model and a specifc data mining or model building task:
+     * The 'fields' request type retrieve the field specification that has been 
+     * registered for a certain model and a specifc data mining or model building 
+     * task:
      *  
      *            Recommender ---- ( fields ) ----> Redis
      * 
      * note, that a task can control different models, which are distinguished 
      * by the respective model name
-     * 
-     * b) /admin/status
-     * 
-     * This request retrieves the actual (last) status of a mining or model building
-     * task or a list of all stati that refer to a certain task.
-     *  
-     *            Recommender ---- ( status ) ----> Redis
-     * 
      */
-    path("admin" / Segment) {subject =>  
+    path("fields") {
 	  post {
 	    respondWithStatus(OK) {
-	      ctx => doAdmin(ctx,subject)
+	      ctx => doFields(ctx)
 	    }
 	  }
     }  ~  
-    path("build" / Segment) {subject =>
+    /**
+     * The 'register' request supports the registration of a field or metadata specification
+     * for a certain mining or model building task (uid) and a specific matrix or model, 
+     * identified by a unique 'name':
+     *  
+     *            Recommender ---- ( register ) ----> Redis
+     * 
+     */
+    path("register" / Segment) {subject =>  
 	  post {
 	    respondWithStatus(OK) {
-	      ctx => doBuild(ctx,subject)
+	      ctx => doRegister(ctx,subject)
 	    }
 	  }
     }  ~ 
@@ -107,6 +104,42 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient sc:SparkContext
 	  post {
 	    respondWithStatus(OK) {
 	      ctx => doIndex(ctx,subject)
+	    }
+	  }
+    }  ~ 
+    /**
+     * The 'track' request type supports tracking of 'event' and 'item' based information 
+     * objects; these objects may be accompanied by an explicit 'score' field. Note, that
+     * this field MUST be provided, if an explicit rating approach is used to train a model.
+     *  
+     *            Recommender ---- ( track ) ----> Elasticsearch index
+     * 
+     */
+    path("track" / Segment) {subject => 
+	  post {
+	    respondWithStatus(OK) {
+	      ctx => doTrack(ctx,subject)
+	    }
+	  }
+    }  ~  
+    /**
+     * The 'status' request type  retrieves the actual (last) status of a mining or model 
+     * building task or a list of all stati that refer to a certain task.
+     *  
+     *            Recommender ---- ( status ) ----> Redis
+     * 
+     */
+    path("status" / Segment) {subject =>
+	  post {
+	    respondWithStatus(OK) {
+	      ctx => doStatus(ctx,subject)
+	    }
+	  }
+    }  ~ 
+    path("build" / Segment) {subject =>
+	  post {
+	    respondWithStatus(OK) {
+	      ctx => doBuild(ctx,subject)
 	    }
 	  }
     }  ~ 
@@ -129,36 +162,13 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient sc:SparkContext
 	    }
 	  }
     }  ~ 
-    /**
-     * The 'register' request supports the registration of a field or metadata specification
-     * for a certain mining or model building task (uid) and a specific matrix or model, 
-     * identified by a unique 'name':
-     *  
-     *            Recommender ---- ( register ) ----> Redis
-     * 
-     */
-    path("register" / Segment) {subject =>  
+    path("similar" / Segment) {subject =>  
 	  post {
 	    respondWithStatus(OK) {
-	      ctx => doRegister(ctx,subject)
+	      ctx => doSimilar(ctx,subject)
 	    }
 	  }
     }  ~ 
-    /**
-     * The 'track' request type supports tracking of 'event' and 'item' based information 
-     * objects; these objects may be accompanied by an explicit 'score' field. Note, that
-     * this field MUST be provided, if an explicit rating approach is used to train a model.
-     *  
-     *            Recommender ---- ( track ) ----> Elasticsearch index
-     * 
-     */
-    path("track" / Segment) {subject => 
-	  post {
-	    respondWithStatus(OK) {
-	      ctx => doTrack(ctx,subject)
-	    }
-	  }
-    }  ~  
     pathPrefix("web") {
       /*
        * 'web' is the prefix for static public content that is
@@ -175,58 +185,43 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient sc:SparkContext
   }
   
   /**
-   * 'admin' is an administration request to determine whether
-   * a certain data mining or knowledge building task has been
-   * finished or not; the only parameter required for status
-   * requests is the unique identifier of a certain task.
-   * 
-   * Another admininistration request retrieves the field
-   * specification that is assigned to certain data mining
-   * or model building task.
+   * 'fields' is an administration request to retrieve the field
+   * specification that is assigned to certain data mining or model 
+   * building task. 'fields' requests specify a part of the metadata
+   * management interface of the recommender
    */
-  private def doAdmin[T](ctx:RequestContext,subject:String) = {
- 
-    val service = "recom"
-    
-    subject match {
-      
-      case "fields" => doRequest(ctx,service,subject)
-      case "status" => doRequest(ctx,service,subject)
-      
-      case _ => {}
-      
-    }
-    
-  }
-
+  private def doFields[T](ctx:RequestContext) = doRequest(ctx,"","fields")
+  
   /**
-   * 'build' describes the initial step of creating a recommender model;
-   * the subsequent step (not invoked by the REST API) comprises training 
-   * with previously prepared data. Training is initiated through the Akka
-   * remote service that interacts with the user preference service
+   * 'register' describes an administration request to persist
+   * meta data descriptions either for event based or item based
+   * data sources. These metadata descriptions are used to map
+   * internal and external field specifications
    */
-  private def doBuild[T](ctx:RequestContext,subject:String) = {
+  private def doRegister[T](ctx:RequestContext,subject:String) = {
     
-    val service = "rating"
+    val service = ""
       
     subject match {
       /* 
-       * Build a recommender model based on an event related
-       * data source
+       * Register the metadata specification for an event based
+       * data source; the specification is persisted in a Redis
+       * instance and will be used to adequately access a data
+       * soucre
        */
-      case Topics.EVENT => doRequest(ctx,service,"build:event")
+      case Topics.EVENT => doRequest(ctx,service,"register:event")
       /*
-       * Build a recommender model based on an item related
-       * data source
+       * Register the metadata specification for an item based
+       * data source; the specification is persisted in a Redis
+       * instance and will be used to adequately access a data
+       * soucre
        */
-      case Topics.ITEM => doRequest(ctx,service,"build:item")
+      case Topics.ITEM => doRequest(ctx,service,"register:item")
       
       case _ => {/* do nothing */}
       
     }
-    
   }
-
   /**
    * 'index' describes an administration request to create an
    * Elasticsearch index either for events or items; this request
@@ -257,6 +252,89 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient sc:SparkContext
       case _ => {/* do nothing */}
       
     }
+  }  
+  /**
+   * 'track' describes a request to register a single 'event' 
+   * or 'item' for later used; the indexing functionality is
+   * done by the recommender and NOT delegated to the respective
+   * service
+   */
+  private def doTrack[T](ctx:RequestContext,subject:String) = {
+    
+    val service = ""
+      
+    subject match {
+      /* 
+       * Track a single event; this event is registered in an 
+       * Elasticsearch index and will be used for preference
+       * building as well as for training factorization models
+       */
+      case Topics.EVENT => doRequest(ctx,service,"track:event")
+      /*
+       * Track a single item; this item is registered in an 
+       * Elasticsearch index and will used for preference
+       * building as well as for data mining (association
+       * rules) and training and ALS model
+       */
+      case Topics.ITEM => doRequest(ctx,service,"track:item")
+      
+      case _ => {/* do nothing */}
+      
+    }
+    
+  }
+  /**
+   * 'status' is an administration request to determine whether a certain data mining 
+   * or knowledge building task has been finished or not; the only parameter required 
+   * for status requests is the unique identifier of a certain task
+   */
+  private def doStatus[T](ctx:RequestContext,subject:String) = {
+    
+    val service = ""
+    subject match {
+      /*
+       * Retrieve the 'latest' status information about a certain
+       * data mining or model building task.
+       */
+      case "latest" => doRequest(ctx,service,"status:latest")
+      /*
+       * Retrieve 'all' stati assigned to a certain data mining
+       * or model building task.
+       */
+      case "all" => doRequest(ctx,service,"status:all")
+      
+      case _ => {/* do nothing */}
+    
+    }
+  
+  }
+
+  /**
+   * 'build' describes the initial step of creating a recommender model;
+   * the subsequent step (not invoked by the REST API) comprises training 
+   * with previously prepared data. Training is initiated through the Akka
+   * remote service that interacts with the user preference service
+   */
+  private def doBuild[T](ctx:RequestContext,subject:String) = {
+    
+    val service = "rating"
+      
+    subject match {
+      /* 
+       * Build a recommender model based on an event related
+       * data source
+       */
+      case Topics.EVENT => doRequest(ctx,service,"build:event")
+      /*
+       * Build a recommender model based on an item related
+       * data source
+       */
+      case Topics.ITEM => doRequest(ctx,service,"build:item")
+      
+      case _ => {/* do nothing */}
+      
+    }
+    
   }
   
   /**
@@ -296,12 +374,6 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient sc:SparkContext
        */
       case Topics.ITEM => doRequest(ctx,service,"recommend:item")
       /* 
-       * Recommend 'similar' items to a certain site and list of 
-       * items; this is request is actually restricted to the 
-       * Context-Aware Analysis engine
-       */
-      case Topics.SIMILAR => doRequest(ctx,service,"recommend:similar")
-      /* 
        * Recommend 'user' to a certain (site,item) combination
        */
       case Topics.USER => doRequest(ctx,service,"recommend:user")
@@ -311,77 +383,25 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient sc:SparkContext
     }
     
   }
-  
   /**
-   * 'register' describes an administration request to persist
-   * meta data descriptions either for event based or item based
-   * data sources. These metadata descriptions are used to map
-   * internal and external field specifications
+   * 'similar' supports the retrieval of items that are similar
+   * to those items that have been provided with the request
    */
-  private def doRegister[T](ctx:RequestContext,subject:String) = {
+  private def doSimilar[T](ctx:RequestContext,subject:String) = {
     
     val service = ""
       
     subject match {
       /* 
-       * Register the metadata specification for an event based
-       * data source; the specification is persisted in a Redis
-       * instance and will be used to adequately access a data
-       * soucre
+       * Recommend 'similar' items to a certain site and list of 
+       * items; this is request is actually restricted to the 
+       * Context-Aware Analysis engine
        */
-      case Topics.EVENT => doRequest(ctx,service,"register:event")
-      /*
-       * Register the metadata specification for an item based
-       * data source; the specification is persisted in a Redis
-       * instance and will be used to adequately access a data
-       * soucre
-       */
-      case Topics.ITEM => doRequest(ctx,service,"register:item")
-      
-      case _ => {/* do nothing */}
-      
-    }
-  }
-  /**
-   * 'status' is an administration request to determine whether
-   * a certain data mining or knowledge building task has been
-   * finished or not; the only parameter required for status
-   * requests is the unique identifier of a certain task
-   */
-  private def doStatus[T](ctx:RequestContext) = {
+      case Topics.EVENT => doRequest(ctx,service,"similar:event")
+      case Topics.ITEM  => 
+        
+      case _ =>  {/* do nothing */}
     
-    val service = ""
-    doRequest(ctx,service,"status")
-  
-  }
-  
-  /**
-   * 'track' describes a request to register a single 'event' 
-   * or 'item' for later used; the indexing functionality is
-   * done by the recommender and NOT delegated to the respective
-   * service
-   */
-  private def doTrack[T](ctx:RequestContext,subject:String) = {
-    
-    val service = ""
-      
-    subject match {
-      /* 
-       * Track a single event; this event is registered in an 
-       * Elasticsearch index and will be used for preference
-       * building as well as for training factorization models
-       */
-      case Topics.EVENT => doRequest(ctx,service,"track:event")
-      /*
-       * Track a single item; this item is registered in an 
-       * Elasticsearch index and will used for preference
-       * building as well as for data mining (association
-       * rules) and training and ALS model
-       */
-      case Topics.ITEM => doRequest(ctx,service,"track:item")
-      
-      case _ => {/* do nothing */}
-      
     }
     
   }
@@ -403,6 +423,13 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient sc:SparkContext
            * or ASR algorithms 
            */
           ctx.complete(result.asInstanceOf[Preferences])
+
+        } else if (result.isInstanceOf[PreferenceWithContext]) {
+          /*
+           * This is the response type used for 'predict'
+           * requests that refer to the CAR algorithm
+           */
+           ctx.complete(result.asInstanceOf[PreferenceWithContext])
 
         } else if (result.isInstanceOf[ScoredFields]) {
           /*

@@ -51,7 +51,7 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
    * The RemoteContext is used to interact with the User Preference engine
    * as well as with other engines from Predictiveworks.
    */
-  private val rtx = new RemoteContext()
+  private val rc = new RemoteContext()
   
   def receive = {
     
@@ -250,11 +250,18 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
     
     worker match {
 
-      case "build" => context.actorOf(Props(new BuildActor(sc,rtx)))
-      case "train" => context.actorOf(Props(new TrainActor(sc,rtx)))
-
-      case "predict"   => context.actorOf(Props(new PredictActor(sc,rtx)))      
-      case "recommend" => context.actorOf(Props(new RecommendActor(sc,rtx)))  
+      case "build" => context.actorOf(Props(new ModelBuilder(sc,rc)))
+      case "train" => context.actorOf(Props(new Distributor(sc,rc)))
+      /*
+       * The subsequent tasks are delegated to the algorithm specific actors;
+       * this is done by the Distributor actor
+       * 
+       * Master [static] ----> Distributor [request] ----> (e.g) CARActor [request]
+       * 
+       */
+      case "predict"   => context.actorOf(Props(new Distributor(sc,rc)))      
+      case "recommend" => context.actorOf(Props(new Distributor(sc,rc)))  
+      case "similar"   => context.actorOf(Props(new Distributor(sc,rc)))      
 
       /*
        * Metadata management is part of the core functionality; field or metadata

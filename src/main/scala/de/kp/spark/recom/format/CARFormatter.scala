@@ -17,18 +17,26 @@ package de.kp.spark.recom.format
 * 
 * If not, see <http://www.gnu.org/licenses/>.
 */
+import org.apache.spark.SparkContext
 
 import de.kp.spark.core.Names
 import de.kp.spark.core.model._
 
+import de.kp.spark.recom.source.EventSource
 import de.kp.spark.recom.util.{Dict,Events,Items,Users}
 
-class CARFormatter extends Serializable {
+class CARFormatter(@transient sc:SparkContext,req:ServiceRequest) extends Serializable {
 
-  def format(req:ServiceRequest):Array[Double] = {
+  private val edict = Events.get(req)
     
-    val idict = Items.get(req)
-    val udict = Users.get(req)
+  private val idict = Items.get(req)
+  private val udict = Users.get(req)
+
+  def userCount = udict.size
+  
+  def itemCount = idict.size
+  
+  def format:Array[Double] = {
     
     val user = req.data(Names.REQ_USER)
     val item = req.data(Names.REQ_ITEM) 
@@ -38,12 +46,12 @@ class CARFormatter extends Serializable {
      * parameter here, as it is expected that the respective
      * directories are retrieved on a per 'site' basis
      */
-    val ublock = activeUserBlock(user,udict)
+    val ublock = activeUserCols(user,udict)
         
     /* Build block to descibe the active (rated) item */
-    val iblock = activeItemBlock(item,idict)
+    val iblock = activeItemCols(item,idict)
     
-    val context = req.data(Names.REQ_CONTEXT).split(",").map(_.toDouble)
+    val context = contextAsCols
     ublock ++ iblock ++ context
     
   }
@@ -52,7 +60,7 @@ class CARFormatter extends Serializable {
    * This method determines the user vector part from the externally
    * known and provided unique user identifier
    */
-  private def activeUserBlock(uid:String,udict:Dict):Array[Double] = {
+  private def activeUserCols(uid:String,udict:Dict):Array[Double] = {
     
     val block = Array.fill[Double](udict.size)(0.0)
     
@@ -67,7 +75,7 @@ class CARFormatter extends Serializable {
    * This method determines the item vector part from the externally
    * known and provided unique item identifier
    */
-  private def activeItemBlock(iid:String, idict:Dict):Array[Double] = {
+  private def activeItemCols(iid:String, idict:Dict):Array[Double] = {
     
     val block = Array.fill[Double](idict.size)(0.0)
     
@@ -75,6 +83,129 @@ class CARFormatter extends Serializable {
     block(pos) = 1
     
     block
+    
+  }
+  
+  def usersAsList:List[Int] = new EventSource(sc).activeUsersAsList(req, this)
+  
+  def itemsAsList:List[Int] = new EventSource(sc).activeItemsAsList(req, this)
+  
+  def userAsCol(uid:String):Int = udict.getLookup(uid)
+    
+  /**
+   * This method transforms a list of user identifiers into
+   * a binary representation
+   */
+  def usersAsCols:Array[Double] = {
+ 
+    val block = Array.fill[Double](udict.size)(0.0)
+    
+    val users = req.data(Names.REQ_USERS).split(":")
+    users.foreach(uid => {
+ 
+      val pos = udict.getLookup(uid)
+      block(pos) = 1
+       
+    })
+    
+    block
+
+  }
+  /**
+   * This method transforms a list of item identifiers into
+   * a binary representation
+   */
+  def itemsAsCols:Array[Double] = {
+ 
+    val block = Array.fill[Double](idict.size)(0.0)
+    
+    val items = req.data(Names.REQ_ITEMS).split(":")
+    items.foreach(iid => {
+ 
+      val pos = idict.getLookup(iid)
+      block(pos) = 1
+       
+    })
+    
+    block
+
+  }
+
+  def eventAsCols:Array[Double] = {
+    
+    val event = req.data(Names.REQ_EVENT)
+    
+    val block = Array.fill[Double](edict.size)(0.0)
+    
+    val pos = edict.getLookup(event)
+    block(pos) = 1
+    
+    block
+    
+  }
+  /**
+   * This method retrieves the 'rated item block' from the 
+   * computed user preferences or ratings
+   */
+  def ratedAsCols:Array[Double] = {
+    new EventSource(sc).ratedItemsAsCols(req, this)
+  }
+  
+  def relatedAsCols:Array[Double] = {
+
+    val block = Array.fill[Double](idict.size)(0.0)    
+    val iid = req.data(Names.REQ_RELATED)
+ 
+    val pos = idict.getLookup(iid)
+    block(pos) = 1
+    
+    block
+    
+  }
+
+  def timeAsCols:Array[Double] = {
+    
+    val dayOfweek = req.data(Names.REQ_DAY_OF_WEEK).toInt
+    
+    val dblock = Array.fill[Double](1)(7)
+    dblock(dayOfweek) = 1
+ 
+    val hourOfday = req.data(Names.REQ_HOUR_OF_DAY).toInt
+    
+    val hblock = Array.fill[Double](1)(24)
+    hblock(hourOfday) = 1
+
+    dblock ++ hblock
+    
+  }
+  
+  /**
+   * The context part of a feature vector contains the following blocks:
+   * 
+   * a) rated items block
+   * 
+   * b) day of week block
+   * 
+   * c) hour of day block
+   * 
+   * d) event block
+   * 
+   * e) item rated before block
+   * 
+   */
+  def contextAsCols:Array[Double] = {
+
+    val ratedCols = ratedAsCols
+    
+    /* The time dependent part of the context comprises the
+     * subordinate blocks, day of week and time of day 
+     */
+    val timeCols = timeAsCols
+
+    val eventCols = eventAsCols
+    val relatedCols = relatedAsCols
+    
+    ratedAsCols ++ timeCols ++ eventCols ++ relatedCols
     
   }
   
