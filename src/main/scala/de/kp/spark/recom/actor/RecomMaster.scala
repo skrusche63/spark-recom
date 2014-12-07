@@ -174,7 +174,12 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
     ask(actor(task),req)
     
   }
-  
+  /**
+   * This method is responsible for preparing the next task in a
+   * model building pipeline; the recommender actually interacts
+   * with the user preference engine (service: rating) and the
+   * context-aware analysis engine (service: context).
+   */
   private def doResponse(res:ServiceResponse) {
     
     val service = res.service
@@ -265,7 +270,7 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
     
           val excludes = List(Names.REQ_NAME,Names.REQ_START,Names.REQ_END,Names.REQ_MATRIX)
           val data = Map(Names.REQ_NAME -> name,Names.REQ_START -> start.toString,Names.REQ_END -> end.toString,Names.REQ_MATRIX -> "user") ++  
-              res.data.filter(kv => excludes.contains(kv._1) == false)  
+                       res.data.filter(kv => excludes.contains(kv._1) == false)  
           
           /*
            * The service is actually not set with here, as the respective
@@ -290,10 +295,20 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
 
           val task = "train:model"
           /*
+           * The algorithm specified for the next task in the pipeline is
+           * either 'ALS' or 'CAR', i.e. in any case we continue with 
+           * factorization based model building
+           */  
+          val algorithm = res.data(Names.REQ_NEXT_ALGORITHM)
+          
+          val excludes = List(Names.REQ_ALGORITHM,Names.REQ_NEXT_ALGORITHM)
+          val data = Map(Names.REQ_ALGORITHM -> algorithm) ++ res.data.filter(kv => excludes.contains(kv._1) == false)  
+          
+          /*
            * The service is actually not set with here, as the respective
            * value is determined by the actors that process this request
            */
-          val req = new ServiceRequest("",task,res.data)
+          val req = new ServiceRequest("",task,data)
           ask(actor("train"),req)
           
         }

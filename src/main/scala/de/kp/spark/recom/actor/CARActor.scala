@@ -42,12 +42,24 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
    * User Preference engine of Predictiveworks.
    */
   def doBuildRequest(req:ServiceRequest) {
-
+    /*
+     * The user specifies the algorithm as 'CAR'; this algorithm
+     * is not known by the user preference engine and must be replaced
+     * by EPREF, i.e. NPREF and CAR are strongly correlated by this
+     * recommender.
+     * 
+     * EPREF is an event based preference algorithm that is supported by
+     * the preference engine
+     */
+    val excludes = List(Names.REQ_ALGORITHM)
+    val data = Map(Names.REQ_ALGORITHM -> "EPREF", Names.REQ_NEXT_ALGORITHM -> "CAR") ++ 
+                 req.data.filter(kv => excludes.contains(kv._1) == false)  
+    
+    val message = Serializer.serializeRequest(new ServiceRequest(req.service,req.task,data))
     /*
      * Building user rating is a fire-and-forget task
      * from the recommendation service prespective
      */
-    val message = Serializer.serializeRequest(req)
     rtx.send(req.service,message)
     
   }

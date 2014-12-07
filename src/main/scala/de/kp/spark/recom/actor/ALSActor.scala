@@ -43,7 +43,20 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
   def doBuildRequest(req:ServiceRequest) {
       
     val service = req.service
-    val message = Serializer.serializeRequest(req)
+    /*
+     * The user specifies the algorithm as 'ALS'; this algorithm is
+     * not known by the user preference engine and must be replaced
+     * by NPREF, i.e. NPREF and ALS are strongly correlated by this
+     * recommend
+     * 
+     * NPREF is an item based preference algorithm that is supported 
+     * by the preference engine
+     */
+    val excludes = List(Names.REQ_ALGORITHM)
+    val data = Map(Names.REQ_ALGORITHM -> "NPREF", Names.REQ_NEXT_ALGORITHM -> "ALS") ++  
+                 req.data.filter(kv => excludes.contains(kv._1) == false)  
+    
+    val message = Serializer.serializeRequest(new ServiceRequest(req.service,req.task,data))
     /*
      * Building user rating is a fire-and-forget task
      * from the recommendation service prespective
