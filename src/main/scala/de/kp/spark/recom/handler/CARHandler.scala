@@ -149,27 +149,30 @@ class CARHandler(@transient sc:SparkContext) {
     val formatter = new CARFormatter(sc,req)
     
     val topic = req.task.split(":")(1)    
-    val columns = if (topic == Topics.ITEM) {
+    val data = if (topic == Topics.ITEM) {
       /*
        * This request recommends similar items to those that have 
        * been voted by a specified 'user'
        */
-      formatter.itemsAsList.mkString(",")
+      val columns = formatter.itemsAsList.mkString(",")
       
+      val excludes = List(Names.REQ_COLUMNS, Names.REQ_MATRIX)
+      Map(Names.REQ_COLUMNS -> columns,Names.REQ_MATRIX -> "item") ++  req.data.filter(kv => excludes.contains(kv._1) == false)  
+     
     } else if (topic == Topics.USER) {
       /*
        * This request recommends similar users to those that have 
        * been voted for a specified 'item'
        */
-      formatter.usersAsList.mkString(",")
+      val columns = formatter.usersAsList.mkString(",")
+      
+      val excludes = List(Names.REQ_COLUMNS, Names.REQ_MATRIX)
+      Map(Names.REQ_COLUMNS -> columns,Names.REQ_MATRIX -> "user") ++  req.data.filter(kv => excludes.contains(kv._1) == false)  
       
     } else {
       throw new Exception("This request type is not supported by the CAR algorithm.")
     }
-      
-    val excludes = List(Names.REQ_COLUMNS)
-    val data = Map(Names.REQ_COLUMNS -> columns) ++  req.data.filter(kv => excludes.contains(kv._1) == false)  
-
+ 
     return Serializer.serializeRequest(new ServiceRequest(service,task,data))
 
   }
@@ -219,10 +222,21 @@ class CARHandler(@transient sc:SparkContext) {
     }
     
     val formatter = new CARFormatter(sc,req)
-    val columns = if (users) formatter.usersAsCols.mkString(",") else formatter.itemsAsCols.mkString(",")
+    val data = if (users) {
       
-    val excludes = List(Names.REQ_COLUMNS)
-    val data = Map(Names.REQ_COLUMNS -> columns) ++  req.data.filter(kv => excludes.contains(kv._1) == false)  
+      val columns = formatter.usersAsCols.mkString(",")
+     
+      val excludes = List(Names.REQ_COLUMNS,Names.REQ_MATRIX)
+      Map(Names.REQ_COLUMNS -> columns,Names.REQ_MATRIX -> "user") ++  req.data.filter(kv => excludes.contains(kv._1) == false)  
+      
+    } else {
+      
+      val columns = formatter.itemsAsCols.mkString(",")
+      
+      val excludes = List(Names.REQ_COLUMNS,Names.REQ_MATRIX)
+      Map(Names.REQ_COLUMNS -> columns,Names.REQ_MATRIX -> "item") ++  req.data.filter(kv => excludes.contains(kv._1) == false)  
+     
+    }
 
     return Serializer.serializeRequest(new ServiceRequest(service,task,data))
     

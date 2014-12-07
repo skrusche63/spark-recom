@@ -35,6 +35,7 @@ import de.kp.spark.recom.Configuration
 import de.kp.spark.recom.model._
 
 import de.kp.spark.recom.RemoteContext
+import de.kp.spark.recom.format.CARFormatter
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.Future
@@ -199,19 +200,78 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
         val status = res.task
         if (status == ResponseStatus.MATRIX_TRAINING_FINISHED) {
           /*
-           * In this case, no action is taken as this indicates the final
-           * step of a pipeline of tasks
+           * In this case, we have to determine which matrix training request
+           * has been finished; note, that we actually support two different
+           * matrices: a) user similarity matrix and b) item similarity matrix
            */
+          val matrix = res.data(Names.REQ_MATRIX) 
+          if (matrix == "user") {
+            /*
+             * In this case, we have to build the item similarity matrix as
+             * the final preparation step
+             */  
+            val task = "train:matrix"
+            /*
+             * Retrieve the unique task identifier and the name of the factorization 
+             * model; note, that this name is the one that is known by the requestor 
+             */
+            val uid = res.data(Names.REQ_UID)
+            val name = res.data(Names.REQ_NAME)
+          
+            /*
+             * Determine start and end position of the item block
+             */          
+            val formatter = new CARFormatter(sc,new ServiceRequest("","",Map(Names.REQ_UID -> uid, Names.REQ_NAME -> name)))
+          
+            val userCount = formatter.userCount
+            val itemCount = formatter.itemCount
+            
+            val start = userCount
+            val end   = start + itemCount - 1
+    
+            val excludes = List(Names.REQ_NAME,Names.REQ_START,Names.REQ_END,Names.REQ_MATRIX)
+            val data = Map(Names.REQ_NAME -> name,Names.REQ_START -> start.toString,Names.REQ_END -> end.toString,Names.REQ_MATRIX -> "item") ++  
+                res.data.filter(kv => excludes.contains(kv._1) == false)  
+          
+            /*
+             * The service is actually not set with here, as the respective
+             * value is determined by the actors that process this request
+             */
+            val req = new ServiceRequest("",task,data)
+            ask(actor("train"),req)
+         
+          }
+          
         } else if (status == ResponseStatus.MODEL_TRAINING_FINISHED) {
           /*
-           * In this case the matrix training request is initiated
+           * In this case the matrix training request for the user similarity
+           * matrix is initiated
            */
           val task = "train:matrix"
+          /*
+           * Retrieve the unique task identifier and the name of the factorization 
+           * model; note, that this name is the one that is known by the requestor 
+           */
+          val uid = res.data(Names.REQ_UID)
+          val name = res.data(Names.REQ_NAME)
+          
+          /*
+           * Determine start and end position of the user block
+           */          
+          val formatter = new CARFormatter(sc,new ServiceRequest("","",Map(Names.REQ_UID -> uid, Names.REQ_NAME -> name)))
+          
+          val start = 0
+          val end   = start + formatter.userCount - 1
+    
+          val excludes = List(Names.REQ_NAME,Names.REQ_START,Names.REQ_END,Names.REQ_MATRIX)
+          val data = Map(Names.REQ_NAME -> name,Names.REQ_START -> start.toString,Names.REQ_END -> end.toString,Names.REQ_MATRIX -> "user") ++  
+              res.data.filter(kv => excludes.contains(kv._1) == false)  
+          
           /*
            * The service is actually not set with here, as the respective
            * value is determined by the actors that process this request
            */
-          val req = new ServiceRequest("",task,res.data)
+          val req = new ServiceRequest("",task,data)
           ask(actor("train"),req)
           
         }
