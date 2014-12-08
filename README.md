@@ -15,12 +15,14 @@ interactions (*content filtering*).
 An alternative approach that avoid the extensive gathering of external profile data is based on the extraction of inherent 
 and latent data from the underlying dataset to specify users, items and their interactions.
 
-The Predictiveworks recommender uses **latent data** support two different approaches to personalized recommendation:
+The Predictiveworks recommender uses **latent data** and supports two different approaches to personalized recommendation:
 
 ### Latent Relations
 
 This approach uncovers latent relations between items in a large scale dataset und combines these relations with the 
-last user transaction data. It is based on Association Rule Mining and uses the **Top-K NR** algorithm from [Philippe-Fournier Viger](http://www.philippe-fournier-viger.com/).
+last user transaction data. 
+
+It is based on Association Rule Mining and uses the **Top-K NR** algorithm from [Philippe-Fournier Viger](http://www.philippe-fournier-viger.com/).
 
 In 2012, Philippe-Fournier Viger redefined the problem of association rule mining as **Top-K Association Rule Mining**. The 
 proposed algorithm only depends on the parameters *k*, the number of rules to be generated, and *minimum confidence*, and circumvents 
