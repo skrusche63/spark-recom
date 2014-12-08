@@ -1,6 +1,6 @@
 ![Dr.Krusche & Partner PartG](https://raw.github.com/skrusche63/spark-recom/master/images/dr_kruscheundpartner_640.png)
 
-## Predictiveworks Recommender
+## Reactive Recommender System
 
 This project comprises a recommender system based on **Predictiveworks.** and is implemented on top of Apache Spark, 
 Elasticsearch and Typesafe's Akka and Spray.
