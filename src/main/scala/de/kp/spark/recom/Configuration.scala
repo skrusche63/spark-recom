@@ -60,7 +60,7 @@ object Configuration extends Serializable with CoreConf {
     
   }
     
-  override def file:List[String] = {
+  override def input:List[String] = {
   
     val cfg = config.getConfig("file")
     
@@ -91,6 +91,8 @@ object Configuration extends Serializable with CoreConf {
    (url,db,user,password)
    
   }
+  
+  override def output:List[String] = null
   
   override def redis:(String,String) = {
   

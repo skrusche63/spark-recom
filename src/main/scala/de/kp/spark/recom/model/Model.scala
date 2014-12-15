@@ -152,9 +152,10 @@ object Services {
 
 object Sinks {
 
-  val FILE:String = "FILE"
+  val FILE:String    = "FILE"
+  val PARQUET:String = "PARQUET"  
     
-  private val sinks = List(FILE)
+  private val sinks = List(FILE,PARQUET)
   
   def isSink(sink:String):Boolean = sinks.contains(sink)
   
@@ -165,9 +166,10 @@ object Sources {
   val FILE:String    = "FILE"
   val ELASTIC:String = "ELASTIC" 
   val JDBC:String    = "JDBC"    
+  val PARQUET:String = "PARQUET"  
   val PIWIK:String   = "PIWIK"  
     
-  private val sources = List(FILE,ELASTIC,JDBC,PIWIK)
+  private val sources = List(FILE,ELASTIC,JDBC,PARQUET,PIWIK)
   
   def isSource(source:String):Boolean = sources.contains(source)
   

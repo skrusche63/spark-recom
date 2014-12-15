@@ -24,7 +24,7 @@ import org.apache.spark.rdd.RDD
 import de.kp.spark.core.Names
 import de.kp.spark.core.model._
 
-import de.kp.spark.core.source.FileSource
+import de.kp.spark.core.source._
 
 import de.kp.spark.recom.Configuration
 import de.kp.spark.recom.model._
@@ -36,14 +36,42 @@ class ItemSource(@transient sc:SparkContext) {
     val algorithm = req.data(Names.REQ_ALGORITHM)
     if (algorithm == Algorithms.ALS) {
     
-      val path = Configuration.file(1)
-      val rawset = new FileSource(sc).connect(path,req)
-      rawset.map(line => {
+      req.data(Names.REQ_SOURCE) match {
         
-        val Array(site,user,item,pref) = line.split(",")
-        (site,user,item.toInt,pref.toInt)
+        case Sources.FILE => {
+       
+          val path = Configuration.input(1)
+          val rawset = new FileSource(sc).connect(path,req)
+          rawset.map(line => {
         
-      })
+            val Array(site,user,item,pref) = line.split(",")
+            (site,user,item.toInt,pref.toInt)
+        
+          })
+         
+        }
+        
+        case Sources.PARQUET => {
+           
+          val path = Configuration.input(1)
+          val rawset = new ParquetSource(sc).connect(path,req,List.empty[String])
+         
+          rawset.map(record => {
+            
+            val site = record(Names.REQ_SITE).asInstanceOf[String]
+            val user = record(Names.REQ_USER).asInstanceOf[String]
+
+            val item = record(Names.REQ_ITEM).asInstanceOf[Int]
+            val score = record(Names.REQ_SCORE).asInstanceOf[Double]
+           
+            (site,user,item,score.toInt)
+          })
+
+        }
+        
+        case _ => throw new Exception("This item data source is not supported by the ALS algorithm.")
+        
+      }
       
     } else {
       throw new Exception("Recommending items for an item data source is restricted to the ALS algorithm.")

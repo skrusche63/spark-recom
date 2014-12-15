@@ -71,11 +71,13 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
     
     /*
      * Train requests initiated by the Recommender are actually
-     * restricted to file data sources
+     * restricted to text file or parquet file data sources
      */
     val source = req.data(Names.REQ_SOURCE)
-    if (source != Sources.FILE)
-      throw new Exception("The CAR algorithm actually only supports file-based data sources.")
+    
+    val sources = List(Sources.FILE,Sources.PARQUET)
+    if (sources.contains(source) == false)
+      throw new Exception("The CAR algorithm actually only supports text & parquet files as data sources.")
     
     /*
      * Training a factorization model or a correlation matrix is a fire-and-forget 

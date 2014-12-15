@@ -37,7 +37,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 /**
- * The Builder actor is responsible for build implict user ratings from the 
+ * The Builder actor is responsible to build implict user ratings from the 
  * data source provided; this is either an event- or item-based source.
  */
 class ModelBuilder(@transient sc:SparkContext,rc:RemoteContext) extends Distributor(sc,rc) {
@@ -84,13 +84,18 @@ class ModelBuilder(@transient sc:SparkContext,rc:RemoteContext) extends Distribu
      * that the respective sink is set to FILE; this ensures that
      * the ratings are saved as file on a Hadoop file system 
      */
-    if (req.data.contains(Names.REQ_SINK) == false) {
-      return Some(Messages.NO_SINK_PROVIDED(uid))    
-      
-    }
-    
-    if (req.data(Names.REQ_SINK) != Sinks.FILE) {
-      return Some(Messages.FILE_SINK_REQUIRED(uid))          
+    req.data.get(Names.REQ_SINK) match {
+        
+      case None => {
+        return Some(Messages.NO_SINK_PROVIDED(uid))       
+      }
+        
+      case Some(sink) => {
+        if (Sinks.isSink(sink) == false) {
+          return Some(Messages.SINK_IS_UNKNOWN(uid,sink))    
+        }          
+      }
+        
     }
 
     None
