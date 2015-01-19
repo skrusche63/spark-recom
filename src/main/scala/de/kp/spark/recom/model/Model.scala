@@ -89,6 +89,12 @@ object Algorithms {
   
 }
 
+case class StartLearn
+
+case class LearnFailed(params:Map[String,String])
+
+case class LearnFinished(params:Map[String,String])
+
 object Messages extends BaseMessages {
   
   def MISSING_PARAMETERS(uid:String):String = 
