@@ -36,7 +36,7 @@ class CARHandler(@transient sc:SparkContext) {
   def buildPredictRequest(req:ServiceRequest):String = {
 
     val service = "context"
-    val task = "predict:feature"
+    val task = "predict:vector"
     
     if (req.data.contains(Names.REQ_FEATURES)) {
       /*
@@ -144,7 +144,7 @@ class CARHandler(@transient sc:SparkContext) {
   def buildRecommendRequest(req:ServiceRequest):String = {
 
     val service = "context"
-    val task = "similar:feature"
+    val task = "similar:vector"
 
     val formatter = new CARFormatter(sc,req)
     
@@ -212,7 +212,7 @@ class CARHandler(@transient sc:SparkContext) {
   def buildSimilarRequest(req:ServiceRequest):String = {
 
     val service = "context"
-    val task = "similar:feature"
+    val task = "similar:vector"
     
     val users = req.data.contains(Names.REQ_USERS)
     val items = req.data.contains(Names.REQ_ITEMS)

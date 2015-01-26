@@ -189,14 +189,10 @@ object Topics {
    */
   val EVENT:String = "event" 
   val ITEM:String  = "item"
-  /*
-   * 'feature' is the topic, that is used by the Context-Aware
-   * Analysis engine to describe the result of 
-   */
-  val FEATURE:String = "feature"
+
   val USER:String    = "user" 
     
-  private val topics = List(EVENT,FEATURE,ITEM,USER)
+  private val topics = List(EVENT,ITEM,USER)
   
   def isTopic(topic:String):Boolean = topics.contains(topic)
   
