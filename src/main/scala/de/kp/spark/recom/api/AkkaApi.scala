@@ -18,9 +18,9 @@ package de.kp.spark.recom.api
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
-import org.apache.spark.SparkContext
 import akka.actor.{ActorSystem,Props}
 
+import de.kp.spark.recom.RequestContext
 import de.kp.spark.recom.actor.RecomMaster
 /**
  * The Akka API is used to receive messages from Akka engines
@@ -35,9 +35,9 @@ import de.kp.spark.recom.actor.RecomMaster
  * 3) User Preference Engine
  * 
  */
-class AkkaApi(system:ActorSystem,@transient sc:SparkContext) {
+class AkkaApi(system:ActorSystem,@transient ctx:RequestContext) {
 
-  val master = system.actorOf(Props(new RecomMaster(sc)), name="recom-master")
+  val master = system.actorOf(Props(new RecomMaster(ctx)), name="recom-master")
 
   def start() {
      while (true) {}   

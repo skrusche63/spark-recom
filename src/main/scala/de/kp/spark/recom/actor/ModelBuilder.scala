@@ -18,8 +18,6 @@ package de.kp.spark.recom.actor
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-import org.apache.spark.SparkContext
-
 import akka.actor.{ActorRef,Props}
 
 import akka.pattern.ask
@@ -28,10 +26,8 @@ import akka.util.Timeout
 import de.kp.spark.core.Names
 import de.kp.spark.core.model._
 
+import de.kp.spark.recom._
 import de.kp.spark.recom.model._
-import de.kp.spark.recom.Configuration
-
-import de.kp.spark.recom.RemoteContext
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
@@ -40,7 +36,7 @@ import scala.concurrent.duration.DurationInt
  * The Builder actor is responsible to build implict user ratings from the 
  * data source provided; this is either an event- or item-based source.
  */
-class ModelBuilder(@transient sc:SparkContext,rc:RemoteContext) extends Distributor(sc,rc) {
+class ModelBuilder(@transient ctx:RequestContext) extends Distributor(ctx) {
   
   override def validate(req:ServiceRequest):Option[String] = {
 

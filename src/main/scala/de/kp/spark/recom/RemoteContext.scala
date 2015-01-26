@@ -21,7 +21,7 @@ package de.kp.spark.recom
 import scala.concurrent.Future
 import scala.collection.mutable.HashMap
 
-class RemoteContext {
+class RemoteContext extends Serializable {
 
   val clientPool = HashMap.empty[String,RemoteClient]
  

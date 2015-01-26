@@ -18,8 +18,6 @@ package de.kp.spark.recom.actor
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-import org.apache.spark.SparkContext
-
 import akka.actor.{ActorRef,Props}
 
 import akka.pattern.ask
@@ -28,10 +26,8 @@ import akka.util.Timeout
 import de.kp.spark.core.Names
 import de.kp.spark.core.model._
 
+import de.kp.spark.recom._
 import de.kp.spark.recom.model._
-import de.kp.spark.recom.Configuration
-
-import de.kp.spark.recom.RemoteContext
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
@@ -39,7 +35,7 @@ import scala.concurrent.duration.DurationInt
  * The Distributor actor is responsible for distributing service requests
  * with respect to the algorithm provided by the request
  */
-class Distributor(@transient sc:SparkContext,rc:RemoteContext) extends BaseActor {
+class Distributor(@transient ctx:RequestContext) extends BaseActor {
   
   def receive = {
 
@@ -96,10 +92,9 @@ class Distributor(@transient sc:SparkContext,rc:RemoteContext) extends BaseActor
 
     req.data(Names.REQ_ALGORITHM) match {
       
-      case Algorithms.ALS => context.actorOf(Props(new ALSActor(sc,rc)))   
-      
-      case Algorithms.ASR => context.actorOf(Props(new ASRActor(sc,rc)))   
-      case Algorithms.CAR => context.actorOf(Props(new CARActor(sc,rc)))   
+      case Algorithms.ALS => context.actorOf(Props(new ALSActor(ctx)))   
+      //case Algorithms.ASR => context.actorOf(Props(new ASRActor(ctx)))   
+      case Algorithms.CAR => context.actorOf(Props(new CARActor(ctx)))   
 
       case _ => null
       

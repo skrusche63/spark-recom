@@ -18,17 +18,18 @@ package de.kp.spark.recom.actor
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
-import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 import de.kp.spark.core.Names
 
 import de.kp.spark.core.model._
+
+import de.kp.spark.recom.RequestContext
 import de.kp.spark.recom.model._
 
 import scala.concurrent.Future
 
-abstract class BaseWorker(@transient sc:SparkContext) extends BaseActor {
+abstract class BaseWorker(@transient ctx:RequestContext) extends BaseActor {
  
   override def receive = {
 

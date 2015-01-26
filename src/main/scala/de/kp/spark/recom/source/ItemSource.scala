@@ -18,7 +18,6 @@ package de.kp.spark.recom.source
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
-import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 import de.kp.spark.core.Names
@@ -26,10 +25,10 @@ import de.kp.spark.core.model._
 
 import de.kp.spark.core.source._
 
-import de.kp.spark.recom.Configuration
+import de.kp.spark.recom.RequestContext
 import de.kp.spark.recom.model._
 
-class ItemSource(@transient sc:SparkContext) {
+class ItemSource(@transient ctx:RequestContext) {
 
   def get(req:ServiceRequest):RDD[(String,String,Int,Int)] = {
    
@@ -40,8 +39,8 @@ class ItemSource(@transient sc:SparkContext) {
         
         case Sources.FILE => {
        
-          val path = Configuration.input(1)
-          val rawset = new FileSource(sc).connect(path,req)
+          val path = ctx.config.input(1)
+          val rawset = new FileSource(ctx.sc).connect(path,req)
           rawset.map(line => {
         
             val Array(site,user,item,pref) = line.split(",")
@@ -53,8 +52,8 @@ class ItemSource(@transient sc:SparkContext) {
         
         case Sources.PARQUET => {
            
-          val path = Configuration.input(1)
-          val rawset = new ParquetSource(sc).connect(path,req,List.empty[String])
+          val path = ctx.config.input(1)
+          val rawset = new ParquetSource(ctx.sc).connect(path,req,List.empty[String])
          
           rawset.map(record => {
             

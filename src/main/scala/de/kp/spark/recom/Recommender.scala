@@ -18,7 +18,6 @@ package de.kp.spark.recom
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
-import org.apache.spark.SparkContext
 import org.apache.spark.mllib.recommendation.{ALS,MatrixFactorizationModel,Rating}
 
 import de.kp.spark.core.model._
@@ -32,7 +31,7 @@ import de.kp.spark.recom.source.ItemSource
 
 import de.kp.spark.recom.util.{Dict,Items,Users}
 
-class RecommenderModel(@transient sc:SparkContext,req:ServiceRequest) {
+class RecommenderModel(@transient ctx:RequestContext,req:ServiceRequest) {
 
   private val (host,port) = Configuration.redis
   private val sink = new RedisDB(host,port.toInt)
@@ -60,7 +59,7 @@ class RecommenderModel(@transient sc:SparkContext,req:ServiceRequest) {
   def predict(site:String,user:String,items:List[Int]):List[Preference] = {
 
     val uid = users.field2index(user)
-    val candidates = sc.parallelize(items)
+    val candidates = ctx.sc.parallelize(items)
     
     val ratings = model.predict(candidates.map((uid, _))).collect
     ratings.sortBy(-_.rating).map(x => Preference(site,user,x.product,x.rating)).toList
@@ -83,7 +82,7 @@ class RecommenderModel(@transient sc:SparkContext,req:ServiceRequest) {
    */
   private def predict(site:String,pairs:List[(String,Int)]):List[Preference] = {
     
-    val data = sc.parallelize(pairs.map(pair => {
+    val data = ctx.sc.parallelize(pairs.map(pair => {
       
       val uid = users.field2index(pair._1)
       val iid = pair._2
@@ -141,7 +140,7 @@ class RecommenderModel(@transient sc:SparkContext,req:ServiceRequest) {
   
 }
 
-class Recommender(@transient sc:SparkContext) extends Serializable {
+class Recommender(@transient ctx:RequestContext) extends Serializable {
 
   def train(req:ServiceRequest):MatrixFactorizationModel = {
     
@@ -157,14 +156,14 @@ class Recommender(@transient sc:SparkContext) extends Serializable {
      * The format of the 'items' is: site(String), user(String), 
      * item (Int) and preference (Int)
      */
-    val source = new ItemSource(sc)
+    val source = new ItemSource(ctx)
     val nprefs = source.get(req).repartition(partitions)
     /*
      * Create user dictionary as the ALS predictor requires 
      * integers to uniquely specify users
      */
     val users = Users.get(req)
-    val busers = sc.broadcast(users)
+    val busers = ctx.sc.broadcast(users)
 
     val items = Items.get(req)
     /* Convert to spark ratings */

@@ -17,15 +17,16 @@ package de.kp.spark.recom.format
 * 
 * If not, see <http://www.gnu.org/licenses/>.
 */
-import org.apache.spark.SparkContext
 
 import de.kp.spark.core.Names
 import de.kp.spark.core.model._
 
+import de.kp.spark.recom.RequestContext
+
 import de.kp.spark.recom.source.EventSource
 import de.kp.spark.recom.util.{Dict,Events,Items,Users}
 
-class CARFormatter(@transient sc:SparkContext,req:ServiceRequest) extends Serializable {
+class CARFormatter(@transient ctx:RequestContext,req:ServiceRequest) extends Serializable {
 
   private val edict = Events.get(req)
     
@@ -88,9 +89,9 @@ class CARFormatter(@transient sc:SparkContext,req:ServiceRequest) extends Serial
     
   }
   
-  def usersAsList:List[Int] = new EventSource(sc).activeUsersAsList(req, this)
+  def usersAsList:List[Int] = new EventSource(ctx).activeUsersAsList(req, this)
   
-  def itemsAsList:List[Int] = new EventSource(sc).activeItemsAsList(req, this)
+  def itemsAsList:List[Int] = new EventSource(ctx).activeItemsAsList(req, this)
   
   def userAsCol(uid:String):Int = udict.field2index(uid)
     
@@ -150,7 +151,7 @@ class CARFormatter(@transient sc:SparkContext,req:ServiceRequest) extends Serial
    * computed user preferences or ratings
    */
   def ratedAsCols:Array[Double] = {
-    new EventSource(sc).ratedItemsAsCols(req, this)
+    new EventSource(ctx).ratedItemsAsCols(req, this)
   }
   
   def relatedAsCols:Array[Double] = {

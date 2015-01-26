@@ -18,7 +18,6 @@ package de.kp.spark.recom.source
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
-import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 import de.kp.spark.core.Names
@@ -27,13 +26,13 @@ import de.kp.spark.core.redis.RedisCache
 import de.kp.spark.core.source._
 import de.kp.spark.core.model._
 
-import de.kp.spark.recom.Configuration
+import de.kp.spark.recom._
 import de.kp.spark.recom.model._
 
 import de.kp.spark.recom.format.CARFormatter
 import scala.collection.mutable.WrappedArray
 
-class EventSource(@transient sc:SparkContext) {
+class EventSource(@transient ctx:RequestContext) {
 
   val (host,port) = Configuration.redis
   val cache = new RedisCache(host,port.toInt)
@@ -62,9 +61,9 @@ class EventSource(@transient sc:SparkContext) {
       case Sources.FILE => {
 
         val path = Configuration.input(0)
-        val rawset = new FileSource(sc).connect(path,req)
+        val rawset = new FileSource(ctx.sc).connect(path,req)
     
-        val busr = sc.broadcast(formatter.userAsCol(user))      
+        val busr = ctx.sc.broadcast(formatter.userAsCol(user))      
         val head = rawset.filter(line => {
         
           val Array(target,point) = line.split(",")
@@ -82,9 +81,9 @@ class EventSource(@transient sc:SparkContext) {
       case Sources.PARQUET => {
 
         val path = Configuration.input(0)
-        val rawset = new ParquetSource(sc).connect(path,req,List.empty[String])
+        val rawset = new ParquetSource(ctx.sc).connect(path,req,List.empty[String])
     
-        val busr = sc.broadcast(formatter.userAsCol(user))      
+        val busr = ctx.sc.broadcast(formatter.userAsCol(user))      
         val head = rawset.filter(record => {
         
           val seq = record.toSeq
@@ -109,8 +108,8 @@ class EventSource(@transient sc:SparkContext) {
 
     val (item,context) = itemFieldsAsCols(req)
       
-    val bitm = sc.broadcast(item)
-    val bctx = sc.broadcast(context)
+    val bitm = ctx.sc.broadcast(item)
+    val bctx = ctx.sc.broadcast(context)
 
     /*
      * Determine start and end point of user block 
@@ -118,15 +117,15 @@ class EventSource(@transient sc:SparkContext) {
     val start = 0
     val end   = start + formatter.userCount - 1
       
-    val bs = sc.broadcast(start)
-    val be = sc.broadcast(end)
+    val bs = ctx.sc.broadcast(start)
+    val be = ctx.sc.broadcast(end)
 
     req.data(Names.REQ_SOURCE) match {
       
       case Sources.FILE => {
     
         val path = Configuration.input(0)
-        val rawset = new FileSource(sc).connect(path,req)
+        val rawset = new FileSource(ctx.sc).connect(path,req)
         /*
          * We restrict to those lines in the dataset that refer to the provided
          * item and further restrict to those that match the provided context
@@ -167,7 +166,7 @@ class EventSource(@transient sc:SparkContext) {
       case Sources.PARQUET => {
         
         val path = Configuration.input(0)
-        val rawset = new ParquetSource(sc).connect(path,req,List.empty[String])
+        val rawset = new ParquetSource(ctx.sc).connect(path,req,List.empty[String])
         /*
          * We restrict to those lines in the dataset that refer to the provided
          * item and further restrict to those that match the provided context
@@ -222,8 +221,8 @@ class EventSource(@transient sc:SparkContext) {
 
     val (user,context) = userFieldsAsCols(req)
       
-    val busr = sc.broadcast(user)
-    val bctx = sc.broadcast(context)
+    val busr = ctx.sc.broadcast(user)
+    val bctx = ctx.sc.broadcast(context)
       
     /*
      * Determine start and end point of item block 
@@ -231,15 +230,15 @@ class EventSource(@transient sc:SparkContext) {
     val start = formatter.userCount
     val end   = start + formatter.itemCount - 1
       
-    val bs = sc.broadcast(start)
-    val be = sc.broadcast(end)
+    val bs = ctx.sc.broadcast(start)
+    val be = ctx.sc.broadcast(end)
 
     req.data(Names.REQ_SOURCE) match {
       
       case Sources.FILE => {
     
         val path = Configuration.input(0)
-        val rawset = new FileSource(sc).connect(path,req)
+        val rawset = new FileSource(ctx.sc).connect(path,req)
         /*
          * We restrict to those lines in the dataset that refer to the provided
          * user and further restrict to those that match the provided context
@@ -280,7 +279,7 @@ class EventSource(@transient sc:SparkContext) {
       case Sources.PARQUET => {
     
         val path = Configuration.input(0)
-        val rawset = new ParquetSource(sc).connect(path,req,List.empty[String])
+        val rawset = new ParquetSource(ctx.sc).connect(path,req,List.empty[String])
         /*
          * We restrict to those lines in the dataset that refer to the provided
          * user and further restrict to those that match the provided context

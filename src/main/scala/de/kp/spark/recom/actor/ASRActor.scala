@@ -18,7 +18,6 @@ package de.kp.spark.recom.actor
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
-import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 import de.kp.spark.core.Names
@@ -26,7 +25,7 @@ import de.kp.spark.core.Names
 import de.kp.spark.core.model._
 import de.kp.spark.recom.model._
 
-import de.kp.spark.recom.RemoteContext
+import de.kp.spark.recom._
 
 import scala.concurrent.Future
 import scala.util.control.Breaks._
@@ -37,7 +36,7 @@ import scala.collection.mutable.ArrayBuffer
  * ASRActor is responsible for interaction with the Association
  * Analysis engine to build recommendations from association rules
  */
-class ASRActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(sc) {
+class ASRActor(@transient ctx:RequestContext) extends BaseWorker(ctx) {
 
   private val service = "association"    
   
@@ -72,7 +71,7 @@ class ASRActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
      * Mining association rules is a fire-and-forget task
      * from the recommendation service prespective
      */
-    rtx.send(service,message)
+    ctx.send(service,message)
     
   }
   /**
@@ -91,7 +90,7 @@ class ASRActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
   def doRecommendRequest(req:ServiceRequest):Future[Any] = {
 
     val message = Serializer.serializeRequest(new ServiceRequest(service,"get:transaction",req.data))
-    rtx.send(service,message)
+    ctx.send(service,message)
     
   }
 

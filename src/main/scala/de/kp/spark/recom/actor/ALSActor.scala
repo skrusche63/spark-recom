@@ -17,7 +17,6 @@ package de.kp.spark.recom.actor
 * 
 * If not, see <http://www.gnu.org/licenses/>.
 */
-import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 import de.kp.spark.core.Names
@@ -26,12 +25,12 @@ import de.kp.spark.core.redis.RedisDB
 import de.kp.spark.core.model._
 import de.kp.spark.recom.model._
 
-import de.kp.spark.recom.{Configuration,Recommender,RecommenderModel,RemoteContext}
+import de.kp.spark.recom._
 import de.kp.spark.recom.hadoop.HadoopIO
 
 import scala.concurrent.Future
 
-class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(sc) {
+class ALSActor(@transient ctx:RequestContext) extends BaseWorker(ctx) {
 
   val sink = new RedisDB(host,port.toInt)
   
@@ -61,7 +60,7 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
      * Building user rating is a fire-and-forget task
      * from the recommendation service prespective
      */
-    rtx.send(service,message)
+    ctx.send(service,message)
     
   }
  
@@ -80,7 +79,7 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
      * used to map a certain user (uid) and item (iid) to the 
      * Integer representation required by the ALS algorithm
      */
-    val model = new Recommender(sc).train(req)
+    val model = new Recommender(ctx).train(req)
           
     /* Register model */
     val now = new java.util.Date()
@@ -113,14 +112,14 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
       
         val user = users(0)
       
-        val model = new RecommenderModel(sc, req)
+        val model = new RecommenderModel(ctx, req)
         val preferences = Preferences(model.predict(site,user,items))
     
         serialize(req.data(Names.REQ_UID),preferences)
       
       } else if (users.length > 1 && items.isEmpty == false) {
       
-        val model = new RecommenderModel(sc, req)
+        val model = new RecommenderModel(ctx, req)
         val preferences = Preferences(model.predict(site,users,items))
     
         serialize(req.data(Names.REQ_UID),preferences)
@@ -183,14 +182,14 @@ class ALSActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
          * for a certain site and a single user from
          * the trained ALS model  
          */  
-        val model = new RecommenderModel(sc, req)
+        val model = new RecommenderModel(ctx, req)
         val preferences = Preferences(model.recommend(site,user,total))
     
         serialize(req.data(Names.REQ_UID),preferences)
       
       } else if (user == null && item != -1) {
       
-        val model = new RecommenderModel(sc, req)
+        val model = new RecommenderModel(ctx, req)
         val preferences = Preferences(model.recommend(site,item,total))
     
         serialize(req.data(Names.REQ_UID),preferences)

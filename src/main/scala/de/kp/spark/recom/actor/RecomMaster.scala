@@ -18,7 +18,6 @@ package de.kp.spark.recom.actor
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-import org.apache.spark.SparkContext
 import akka.actor.{ActorRef,Props}
 
 import akka.pattern.ask
@@ -31,28 +30,22 @@ import de.kp.spark.core.Names
 import de.kp.spark.core.actor._
 import de.kp.spark.core.model._
 
-import de.kp.spark.recom.Configuration
+import de.kp.spark.recom._
 import de.kp.spark.recom.model._
 
-import de.kp.spark.recom.RemoteContext
 import de.kp.spark.recom.format.CARFormatter
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.Future
 
-class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
+class RecomMaster(@transient val ctx:RequestContext) extends BaseActor {
   
-  val (duration,retries,time) = Configuration.actor         
+  val (duration,retries,time) = ctx.config.actor         
   implicit val timeout:Timeout = DurationInt(time).second
 
   override val supervisorStrategy = OneForOneStrategy(maxNrOfRetries=retries,withinTimeRange = DurationInt(time).minutes) {
     case _ : Exception => SupervisorStrategy.Restart
   }
-  /**
-   * The RemoteContext is used to interact with the User Preference engine
-   * as well as with other engines from Predictiveworks.
-   */
-  private val rc = new RemoteContext()
   
   def receive = {
     
@@ -226,7 +219,7 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
             /*
              * Determine start and end position of the item block
              */          
-            val formatter = new CARFormatter(sc,new ServiceRequest("","",Map(Names.REQ_UID -> uid, Names.REQ_NAME -> name)))
+            val formatter = new CARFormatter(ctx,new ServiceRequest("","",Map(Names.REQ_UID -> uid, Names.REQ_NAME -> name)))
           
             val userCount = formatter.userCount
             val itemCount = formatter.itemCount
@@ -263,7 +256,7 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
           /*
            * Determine start and end position of the user block
            */          
-          val formatter = new CARFormatter(sc,new ServiceRequest("","",Map(Names.REQ_UID -> uid, Names.REQ_NAME -> name)))
+          val formatter = new CARFormatter(ctx,new ServiceRequest("","",Map(Names.REQ_UID -> uid, Names.REQ_NAME -> name)))
           
           val start = 0
           val end   = start + formatter.userCount - 1
@@ -325,8 +318,8 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
     
     worker match {
 
-      case "build" => context.actorOf(Props(new ModelBuilder(sc,rc)))
-      case "train" => context.actorOf(Props(new Distributor(sc,rc)))
+      case "build" => context.actorOf(Props(new ModelBuilder(ctx)))
+      case "train" => context.actorOf(Props(new Distributor(ctx)))
       /*
        * The subsequent tasks are delegated to the algorithm specific actors;
        * this is done by the Distributor actor
@@ -334,9 +327,9 @@ class RecomMaster(@transient val sc:SparkContext) extends BaseActor {
        * Master [static] ----> Distributor [request] ----> (e.g) CARActor [request]
        * 
        */
-      case "predict"   => context.actorOf(Props(new Distributor(sc,rc)))      
-      case "recommend" => context.actorOf(Props(new Distributor(sc,rc)))  
-      case "similar"   => context.actorOf(Props(new Distributor(sc,rc)))      
+      case "predict"   => context.actorOf(Props(new Distributor(ctx)))      
+      case "recommend" => context.actorOf(Props(new Distributor(ctx)))  
+      case "similar"   => context.actorOf(Props(new Distributor(ctx)))      
 
       /*
        * Metadata management is part of the core functionality; field or metadata

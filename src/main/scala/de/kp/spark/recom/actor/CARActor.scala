@@ -18,7 +18,6 @@ package de.kp.spark.recom.actor
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
-import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 import de.kp.spark.core.Names
@@ -26,13 +25,13 @@ import de.kp.spark.core.Names
 import de.kp.spark.core.model._
 import de.kp.spark.recom.model._
 
-import de.kp.spark.recom.RemoteContext
+import de.kp.spark.recom._
 import de.kp.spark.recom.handler.CARHandler
 
 import de.kp.spark.recom.source.EventSource
 import scala.concurrent.Future
 
-class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(sc) {
+class CARActor(@transient ctx:RequestContext) extends BaseWorker(ctx) {
   
   private val service = "context"
 
@@ -60,7 +59,7 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
      * Building user rating is a fire-and-forget task
      * from the recommendation service prespective
      */
-    rtx.send(req.service,message)
+    ctx.send(req.service,message)
     
   }
   /**
@@ -85,21 +84,21 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
      * specified as 'train:matrix' or 'train:model'
      */
     val message = Serializer.serializeRequest(new ServiceRequest(service,req.task,req.data))
-    rtx.send(service,message)
+    ctx.send(service,message)
     
   }
 
   def doPredictRequest(req:ServiceRequest):Future[Any] = {
 
-    val message = new CARHandler(sc).buildPredictRequest(req)
-    rtx.send(service,message)
+    val message = new CARHandler(ctx).buildPredictRequest(req)
+    ctx.send(service,message)
      
   }
 
   def buildPredictResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = {
     
     if (intermediate.status == ResponseStatus.SUCCESS) {
-      new CARHandler(sc).buildPredictResponse(req,intermediate)
+      new CARHandler(ctx).buildPredictResponse(req,intermediate)
      
     } else {
       /*
@@ -131,15 +130,15 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
    */
   def doRecommendRequest(req:ServiceRequest):Future[Any] = {
     
-    val message = new CARHandler(sc).buildRecommendRequest(req)
-    rtx.send(service,message)
+    val message = new CARHandler(ctx).buildRecommendRequest(req)
+    ctx.send(service,message)
     
   }
 
   def buildRecommendResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = {
     
     if (intermediate.status == ResponseStatus.SUCCESS) {
-      new CARHandler(sc).buildRecommendResponse(req,intermediate)
+      new CARHandler(ctx).buildRecommendResponse(req,intermediate)
       
     } else {
       /*
@@ -158,15 +157,15 @@ class CARActor(@transient sc:SparkContext,rtx:RemoteContext) extends BaseWorker(
    */
   def doSimilarRequest(req:ServiceRequest):Future[Any] = {
     
-    val message = new CARHandler(sc).buildSimilarRequest(req)
-    rtx.send(service,message)
+    val message = new CARHandler(ctx).buildSimilarRequest(req)
+    ctx.send(service,message)
         
   }
   
   def buildSimilarResponse(req:ServiceRequest,intermediate:ServiceResponse):Any = {
     
     if (intermediate.status == ResponseStatus.SUCCESS) {
-      new CARHandler(sc).buildSimilarResponse(req,intermediate)
+      new CARHandler(ctx).buildSimilarResponse(req,intermediate)
       
     } else {
       /*

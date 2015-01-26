@@ -18,8 +18,6 @@ package de.kp.spark.recom.api
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
-import org.apache.spark.SparkContext
-
 import akka.actor.{ActorRef,ActorSystem,Props}
 import akka.pattern.ask
 
@@ -38,12 +36,12 @@ import scala.util.parsing.json._
 import de.kp.spark.core.model._
 import de.kp.spark.core.rest.RestService
 
-import de.kp.spark.recom.Configuration
+import de.kp.spark.recom.{Configuration, RequestContext => RequestCtx}
 import de.kp.spark.recom.model._
 
 import de.kp.spark.recom.actor.{RecomMaster}
 
-class RestApi(host:String,port:Int,system:ActorSystem,@transient sc:SparkContext) extends HttpService with Directives {
+class RestApi(host:String,port:Int,system:ActorSystem,@transient ctx:RequestCtx) extends HttpService with Directives {
 
   implicit val ec:ExecutionContext = system.dispatcher  
   import de.kp.spark.core.rest.RestJsonSupport._
@@ -51,7 +49,7 @@ class RestApi(host:String,port:Int,system:ActorSystem,@transient sc:SparkContext
   override def actorRefFactory:ActorSystem = system
   
   val (duration,retries,time) = Configuration.actor   
-  val master = system.actorOf(Props(new RecomMaster(sc)), name="recom-master")
+  val master = system.actorOf(Props(new RecomMaster(ctx)), name="recom-master")
     
   def start() {
     RestService.start(routes,system,host,port)

@@ -18,15 +18,15 @@ package de.kp.spark.recom.handler
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
-import org.apache.spark.SparkContext
-
 import de.kp.spark.core.Names
 import de.kp.spark.core.model._
+
+import de.kp.spark.recom.RequestContext
 
 import de.kp.spark.recom.model._
 import de.kp.spark.recom.format.CARFormatter
 
-class CARHandler(@transient sc:SparkContext) {
+class CARHandler(@transient ctx:RequestContext) {
 
   /**
    * This method builds a feature vector from the request parameter that can
@@ -92,7 +92,7 @@ class CARHandler(@transient sc:SparkContext) {
       throw new Exception(msg)      
     }
    
-    val features = new CARFormatter(sc,req).format.mkString(",")
+    val features = new CARFormatter(ctx,req).format.mkString(",")
     
     val data = Map(Names.REQ_FEATURES -> features) ++ req.data     
     return Serializer.serializeRequest(new ServiceRequest(service,task,data))
@@ -146,7 +146,7 @@ class CARHandler(@transient sc:SparkContext) {
     val service = "context"
     val task = "similar:vector"
 
-    val formatter = new CARFormatter(sc,req)
+    val formatter = new CARFormatter(ctx,req)
     
     val topic = req.task.split(":")(1)    
     val data = if (topic == Topics.ITEM) {
@@ -186,7 +186,7 @@ class CARHandler(@transient sc:SparkContext) {
     val total = req.data(Names.REQ_TOTAL).toInt
     val scoredColumns = similars.flatMap(x => x.items).sortBy(x => -x.score).take(total)
     
-    val formatter = new CARFormatter(sc,req)
+    val formatter = new CARFormatter(ctx,req)
     
     val topic = req.task.split(":")(1)    
     if (topic == Topics.ITEM) {
@@ -221,7 +221,7 @@ class CARHandler(@transient sc:SparkContext) {
       new Exception("This similarity request is not supported by the CAR algorithm.")
     }
     
-    val formatter = new CARFormatter(sc,req)
+    val formatter = new CARFormatter(ctx,req)
     val data = if (users) {
       
       val columns = formatter.usersAsCols.mkString(",")
@@ -249,7 +249,7 @@ class CARHandler(@transient sc:SparkContext) {
     val users = req.data.contains(Names.REQ_USERS)
     val items = req.data.contains(Names.REQ_ITEMS)
 
-    val formatter = new CARFormatter(sc,req)
+    val formatter = new CARFormatter(ctx,req)
     
     if (users == false && items == false) {
       new Exception("This similarity request is not supported by the CAR algorithm.")
