@@ -89,7 +89,7 @@ object Algorithms {
   
 }
 
-case class StartLearn
+case class StartLearn()
 
 case class LearnFailed(params:Map[String,String])
 
