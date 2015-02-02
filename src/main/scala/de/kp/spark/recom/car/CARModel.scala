@@ -40,6 +40,9 @@ class CARModel(ctx:RequestContext,params:Map[String,String]) extends Actor with 
       val uid = params(Names.REQ_UID)
       val name = params(Names.REQ_NAME)
       
+      val start = new java.util.Date().getTime.toString            
+      log.info(String.format("""[UID: %s] %s model request received at %s.""",uid,name,start))
+      
       /* 
        * Build service request message to invoke remote Context-Aware Analysis 
        * engine to train a factorization machine model

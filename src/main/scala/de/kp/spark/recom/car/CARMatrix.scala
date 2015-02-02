@@ -37,10 +37,11 @@ class CARMatrix(ctx:RequestContext,params:Map[String,String]) extends Actor with
     
     case message:StartLearn => {
       
-      val req_params = params
+      val uid = params(Names.REQ_UID)
+      val name = params(Names.REQ_NAME)
       
-      val uid = req_params(Names.REQ_UID)
-      val name = req_params(Names.REQ_NAME)
+      val start = new java.util.Date().getTime.toString            
+      log.info(String.format("""[UID: %s] %s matrix request received at %s.""",uid,name,start))
       
       /* 
        * Build service request message to invoke remote Context-Aware Analysis 
@@ -70,7 +71,9 @@ class CARMatrix(ctx:RequestContext,params:Map[String,String]) extends Actor with
           val res = Serializer.deserializeResponse(result)
           if (res.status == ResponseStatus.FAILURE) {
 
-            context.parent ! LearnFailed(res.data)
+            val res_params = params ++ res.data
+            context.parent ! LearnFailed(res_params)
+            
             context.stop(self)
 
           }
@@ -83,7 +86,7 @@ class CARMatrix(ctx:RequestContext,params:Map[String,String]) extends Actor with
           
         case throwable => {
         
-          val res_params = Map(Names.REQ_MESSAGE -> throwable.getMessage) ++ req_params
+          val res_params = params ++ Map(Names.REQ_MESSAGE -> throwable.getMessage)
           context.parent ! LearnFailed(res_params)
           
           context.stop(self)
@@ -94,11 +97,8 @@ class CARMatrix(ctx:RequestContext,params:Map[String,String]) extends Actor with
     }
    
   case event:StatusEvent => {
-      
-      val uid = params(Names.REQ_UID)
-      val name = params(Names.REQ_NAME)
 
-      val res_params = Map(Names.REQ_UID -> event.uid,Names.REQ_MODEL -> name)
+      val res_params = params ++ Map(Names.REQ_MODEL -> "matrix")
       context.parent ! LearnFinished(res_params)
       
       context.stop(self)

@@ -44,7 +44,7 @@ class CARPreference(ctx:RequestContext,params:Map[String,String]) extends Actor 
       val name = params(Names.REQ_NAME)
       
       val start = new java.util.Date().getTime.toString            
-      log.info(String.format("""[UID: %s] %s building request received at %s.""",uid,name,start))
+      log.info(String.format("""[UID: %s] %s preference request received at %s.""",uid,name,start))
       /* 
        * Build service request message to invoke remote preference 
        * engine to build event-based user preferences
@@ -101,7 +101,7 @@ class CARPreference(ctx:RequestContext,params:Map[String,String]) extends Actor 
   case event:StatusEvent => {
       
       val res_params = params ++ Map(Names.REQ_MODEL -> "rating")
-      context.parent ! LearnFinished(res_params)      
+      context.parent ! BuildFinished(res_params)      
       
       context.stop(self)
        

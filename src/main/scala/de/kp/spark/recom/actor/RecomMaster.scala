@@ -33,7 +33,7 @@ import de.kp.spark.core.model._
 import de.kp.spark.recom._
 import de.kp.spark.recom.model._
 
-import de.kp.spark.recom.format.CARFormatter
+import de.kp.spark.recom.car.CARFormatter
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.Future

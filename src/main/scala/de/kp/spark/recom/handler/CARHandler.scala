@@ -24,7 +24,7 @@ import de.kp.spark.core.model._
 import de.kp.spark.recom.RequestContext
 
 import de.kp.spark.recom.model._
-import de.kp.spark.recom.format.CARFormatter
+import de.kp.spark.recom.car.CARFormatter
 
 class CARHandler(@transient ctx:RequestContext) {
 

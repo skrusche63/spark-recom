@@ -89,11 +89,24 @@ object Algorithms {
   
 }
 
+/****************************************************************************
+ * 
+ *              Data Analytics Pipeline
+ * 
+ ***************************************************************************/
+
+case class StartBuild()
+
+case class BuildFailed(params:Map[String,String])
+
+case class BuildFinished(params:Map[String,String])
+
 case class StartLearn()
 
 case class LearnFailed(params:Map[String,String])
 
 case class LearnFinished(params:Map[String,String])
+
 
 object Messages extends BaseMessages {
   

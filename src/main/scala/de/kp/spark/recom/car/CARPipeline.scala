@@ -189,7 +189,7 @@ class CARPipeline(ctx:RequestContext,params:Map[String,String]) extends Actor wi
              * we stop the data analytics pipeline here and inform 
              * the requestor about this situation
              */
-            context.parent ! LearnFinished(res_params)
+            context.parent ! message
             context.stop(self)
           
           }

@@ -26,6 +26,8 @@ import de.kp.spark.core.model._
 import de.kp.spark.recom.model._
 
 import de.kp.spark.recom._
+import de.kp.spark.recom.als._
+
 import de.kp.spark.recom.hadoop.HadoopIO
 
 import scala.concurrent.Future
@@ -79,7 +81,7 @@ class ALSActor(@transient ctx:RequestContext) extends BaseWorker(ctx) {
      * used to map a certain user (uid) and item (iid) to the 
      * Integer representation required by the ALS algorithm
      */
-    val model = new Recommender(ctx).train(req)
+    val model = new ALSRecommender(ctx).train(req)
           
     /* Register model */
     val now = new java.util.Date()
@@ -112,14 +114,14 @@ class ALSActor(@transient ctx:RequestContext) extends BaseWorker(ctx) {
       
         val user = users(0)
       
-        val model = new RecommenderModel(ctx, req)
+        val model = new ALSRecommenderModel(ctx, req)
         val preferences = Preferences(model.predict(site,user,items))
     
         serialize(req.data(Names.REQ_UID),preferences)
       
       } else if (users.length > 1 && items.isEmpty == false) {
       
-        val model = new RecommenderModel(ctx, req)
+        val model = new ALSRecommenderModel(ctx, req)
         val preferences = Preferences(model.predict(site,users,items))
     
         serialize(req.data(Names.REQ_UID),preferences)
@@ -182,14 +184,14 @@ class ALSActor(@transient ctx:RequestContext) extends BaseWorker(ctx) {
          * for a certain site and a single user from
          * the trained ALS model  
          */  
-        val model = new RecommenderModel(ctx, req)
+        val model = new ALSRecommenderModel(ctx, req)
         val preferences = Preferences(model.recommend(site,user,total))
     
         serialize(req.data(Names.REQ_UID),preferences)
       
       } else if (user == null && item != -1) {
       
-        val model = new RecommenderModel(ctx, req)
+        val model = new ALSRecommenderModel(ctx, req)
         val preferences = Preferences(model.recommend(site,item,total))
     
         serialize(req.data(Names.REQ_UID),preferences)
