@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>spark-recom</groupId>
   <artifactId>spark-recom</artifactId>
-  <version>0.0.3</version>
+  <version>0.0.4</version>
   <name>Spark-Recom</name>
   <description>Recommender System based on Predictiveworks. and Apache Spark</description>
   <inceptionYear>2010</inceptionYear>

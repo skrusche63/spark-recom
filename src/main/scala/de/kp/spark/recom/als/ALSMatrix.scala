@@ -25,19 +25,15 @@ import de.kp.spark.core.actor._
 
 import de.kp.spark.core.model._
 
-import de.kp.spark.core.redis.{RedisCache,RedisDB}
+import de.kp.spark.core.redis.RedisCache
 
 import de.kp.spark.recom.{Configuration,RequestContext}
 import de.kp.spark.recom.model._
-
-import de.kp.spark.recom.hadoop.HadoopIO
 
 class ALSMatrix(ctx:RequestContext,params:Map[String,String]) extends Actor with ActorLogging {
 
   val (host,port) = Configuration.redis
   val cache = new RedisCache(host,port.toInt)
-
-  val sink = new RedisDB(host,port.toInt)
 
   def receive = {
     
@@ -53,24 +49,14 @@ class ALSMatrix(ctx:RequestContext,params:Map[String,String]) extends Actor with
         
         val req = ServiceRequest("","",params)
         cache.addStatus(req,ResponseStatus.MATRIX_TRAINING_STARTED)
+
         /*
          * Build ALS recommendation model based on the request data;
          * users & items refer to the reference information that is 
          * used to map a certain user (uid) and item (iid) to the 
          * Integer representation required by the ALS algorithm
          */
-        val model = new ALSRecommender(ctx).train(req)
-          
-        /* Register model */
-        val now = new java.util.Date()
-        val dir = String.format("""%s/matrix/%s/%s""",Configuration.model,name,now.getTime().toString)
-        /*
-         * The ALS model trained is saved on the HDFS file system and
-         * must be load before building any recommendations
-         */
-        HadoopIO.writeRecom(model,dir)
-    
-        sink.addModel(req,dir)          
+        new ALSRecommender(ctx).train(req)
         cache.addStatus(req,ResponseStatus.MATRIX_TRAINING_FINISHED)
 
         val res_params = params ++ Map(Names.REQ_MODEL -> "matrix")
@@ -93,4 +79,5 @@ class ALSMatrix(ctx:RequestContext,params:Map[String,String]) extends Actor with
     }
     
   }
+
 }

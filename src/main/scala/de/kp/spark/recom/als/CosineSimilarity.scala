@@ -1,4 +1,4 @@
-package de.kp.spark.recom
+package de.kp.spark.recom.als
 /* Copyright (c) 2014 Dr. Krusche & Partner PartG
  * 
  * This file is part of the Spark-Recom project
@@ -17,30 +17,23 @@ package de.kp.spark.recom
  * 
  * If not, see <http://www.gnu.org/licenses/>.
  */
-import org.apache.spark.SparkContext
-import org.apache.spark.sql.SQLContext
 
-class RequestContext(  
-  /*
-   * Reference to the common SparkContext; this context can be used
-   * to access HDFS based data sources or leverage the Spark machine
-   * learning library or other Spark based functionality
+object CosineSimilarity {
+  /**
+   * Length of input arrays must be equal; due to performance
+   * issues, we do not check this requirement
    */
-  @transient val sc:SparkContext) extends Serializable {
-
-  val sqlc = new SQLContext(sc)
+  def compute(x:Array[Double],y:Array[Double]):Double = {
+//    require(x.size == y.size)
+    dotProduct(x, y) / (magnitude(x) * magnitude(y))
+  }
   
-  val config = Configuration
-  /*
-   * The base directory for all internal data sources and sinks
-   */
-  val base = Configuration.model
-  /*
-   * The RemoteContext is used to interact with the User Preference engine
-   * as well as with other engines from Predictiveworks.
-   */
-  private val rc = new RemoteContext()
-
-  def send(service:String,message:String) = rc.send(service, message)
+  private def dotProduct(x: Array[Double], y: Array[Double]): Double = {
+    x.zip(y).map(v => v._1 * v._2).sum
+  }
   
+  private def magnitude(x: Array[Double]): Double = {
+    math.sqrt(x.map(i => i*i).sum)
+  }
+
 }
