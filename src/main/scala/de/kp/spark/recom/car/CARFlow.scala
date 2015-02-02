@@ -28,12 +28,20 @@ import de.kp.spark.recom.model._
 
 import scala.collection.mutable.Buffer
 /**
- * CARPipeline controls the data analytics process with respect
- * to build context-aware recommendation models; the process
- * comprises a sequence of three steps: a) build preferences,
- * b) build prediction model, and, c) build similarity matrix
+ * CARFlow controls the data analytics process to build Context-Aware recommendation
+ * models. This process comprises 3 subsequent steps:
+ * 
+ * 1) Build implict user preferences from customer interaction events; these events
+ *    must be tracked & stored in a previous step. The CAR recommender requires an
+ *    Elasticsearch cluster as the user event data store.
+ *    
+ * 2) Learn a factorization machine model from the user preferences; the respective
+ *    preferences must be stored as a Parquet file with the 
+ *    
+ * 3) Learn interaction matrices from the user and also from the item features to 
+ *    specify user and item similarity to support respective similarity requests 
  */
-class CARPipeline(ctx:RequestContext,params:Map[String,String]) extends Actor with ActorLogging {
+class CARFlow(ctx:RequestContext,params:Map[String,String]) extends Actor with ActorLogging {
   
   def receive = {
     
@@ -41,6 +49,12 @@ class CARPipeline(ctx:RequestContext,params:Map[String,String]) extends Actor wi
       
       try {
         
+        /*
+         * Send response to ModelBuilder (parent)
+         */
+        val res_params = params ++ Map(Names.REQ_MESSAGE -> "CAR model building started.")
+        sender ! ServiceResponse("recommendation","build",res_params,ResponseStatus.BUILDING_STARTED)
+       
         validate
        
         val uid = params(Names.REQ_UID)
@@ -48,25 +62,19 @@ class CARPipeline(ctx:RequestContext,params:Map[String,String]) extends Actor wi
 
         log.info(String.format("""[UID: %s] CAR pipeline started at %s.""",uid,start))
      
-        /*
-         * The following parameters must be provided by the requestor:
-         * 
-         * - 'site', 'uid', 'name'
-         * 
-         * - 'algorithm' = CAR
-         * - 'rating'    = implicit | explicit
-         * 
-         * The recommender expects implict or explicit rating data 
-         * tracked by a prior data processing task and indexed in
-         * an Elasticsearch cluster
-         * 
-         * - 'source'    = ELASTIC
-         * 
-         * The 'algorithm' value must be replaced by 'EPREF' 
-         */
-        val req_params = params ++ Map(Names.REQ_ALGORITHM -> "EPREF", Names.REQ_SOURCE -> "ELASTIC", Names.REQ_SINK -> "PARQUET")
+        val req_params = params ++ Map(
+            Names.REQ_ALGORITHM -> "EPREF", 
+            /*
+             * User events as a basis for preference modeling
+             * are tracked and stored in an Elasticsearch cluster
+             */
+            Names.REQ_SOURCE -> "ELASTIC", 
+            /*
+             * The preference modeler is required to save the
+             * results as parquet file
+             */
+            Names.REQ_SINK -> "PARQUET")
       
-        /* Delegate request to CARPreference actor */
         val actor = context.actorOf(Props(new CARPreference(ctx,params)))
         actor ! StartBuild
         
@@ -74,7 +82,7 @@ class CARPipeline(ctx:RequestContext,params:Map[String,String]) extends Actor wi
         case e:Exception => {
 
           val res_params = Map(Names.REQ_MESSAGE -> e.getMessage) ++ params
-          context.parent ! LearnFailed(res_params)
+          context.parent ! BuildFailed(res_params)
           
           context.stop(self)
           
@@ -103,9 +111,14 @@ class CARPipeline(ctx:RequestContext,params:Map[String,String]) extends Actor wi
        * REDIS instance, and therefore no SINK must be provided
        */
       val excludes = List(Names.REQ_ALGORITHM,Names.REQ_SINK)
-      val req_params = res_params.filter(kv => excludes.contains(kv._1) == false) ++ Map(Names.REQ_SOURCE -> "PARQUET")
+      val req_params = res_params.filter(kv => excludes.contains(kv._1) == false) ++ Map(
+          /*
+           * The Context-Aware Analysis engine retrieves preference data
+           * from a parquet file; the factorization machine model is stored
+           * on the HDFS file system
+           */
+          Names.REQ_SOURCE -> "PARQUET")
       
-      /* Delegate request to CARModel actor */
       val actor = context.actorOf(Props(new CARModel(ctx,req_params)))
       actor ! StartLearn
       
@@ -143,9 +156,14 @@ class CARPipeline(ctx:RequestContext,params:Map[String,String]) extends Actor wi
         val formatter = new CARFormatter(ctx, ServiceRequest("","",Map(Names.REQ_UID -> uid, Names.REQ_NAME -> name)))          
         val (start,end) = formatter.getUserBlock
     
-        val excludes = List(Names.REQ_SOURCE, Names.REQ_ALGORITHM,Names.REQ_SINK,Names.REQ_START,Names.REQ_END,Names.REQ_MATRIX)          
-        val req_params = res_params.filter(kv => excludes.contains(kv._1) == false) ++ Map(
-              Names.REQ_START -> start.toString,Names.REQ_END -> end.toString,Names.REQ_MATRIX -> "user"
+        val req_params = res_params ++ Map(
+              Names.REQ_START -> start.toString,
+              Names.REQ_END -> end.toString,
+              /*
+               * Inform the matrix modeler to build a similarity
+               * matrix from the user latent feature vectors
+               */
+              Names.REQ_MATRIX -> "user"
         )  
       
         val actor = context.actorOf(Props(new CARMatrix(ctx,req_params)))
@@ -173,9 +191,14 @@ class CARPipeline(ctx:RequestContext,params:Map[String,String]) extends Actor wi
             val formatter = new CARFormatter(ctx,new ServiceRequest("","",Map(Names.REQ_UID -> uid, Names.REQ_NAME -> name)))
             val (start,end) = formatter.getItemBlock
     
-            val excludes = List(Names.REQ_SOURCE, Names.REQ_ALGORITHM,Names.REQ_SINK,Names.REQ_START,Names.REQ_END,Names.REQ_MATRIX)          
-            val req_params = res_params.filter(kv => excludes.contains(kv._1) == false) ++ Map(
-                Names.REQ_START -> start.toString,Names.REQ_END -> end.toString,Names.REQ_MATRIX -> "user"
+            val req_params = res_params ++ Map(
+                Names.REQ_START -> start.toString,
+                Names.REQ_END -> end.toString,
+                /*
+                 * Inform the matrix modeler to a build a similarity
+                 * matrix from the item latent feature vectors
+                 */
+                Names.REQ_MATRIX -> "item"
             )  
       
             /* Delegate request to CARMatrix actor */

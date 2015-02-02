@@ -29,66 +29,153 @@ import de.kp.spark.core.model._
 import de.kp.spark.recom._
 import de.kp.spark.recom.model._
 
+import de.kp.spark.recom.als.ALSFlow
+import de.kp.spark.recom.asr.ASRFlow
+import de.kp.spark.recom.car.CARFlow
+
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-/**
- * The Builder actor is responsible to build implict user ratings from the 
- * data source provided; this is either an event- or item-based source.
- */
-class ModelBuilder(@transient ctx:RequestContext) extends Distributor(ctx) {
+class ModelBuilder(@transient ctx:RequestContext,params:Map[String,String]) extends BaseActor {
   
-  override def validate(req:ServiceRequest):Option[String] = {
+  def receive = {
 
-    val uid = req.data(Names.REQ_UID)
-   
-    if (cache.statusExists(req)) {            
-      return Some(Messages.TASK_ALREADY_STARTED(uid))   
+    case message:StartBuild => {
+      
+      val origin = sender              
+      val response = try {
+        
+        validate match {
+            
+          case None => execute             
+          
+          case Some(message) => Future {
+            val req = ServiceRequest("recommendation","build",params)
+            failure(req,message)
+          }
+        
+        }        
+      
+      } catch {
+        case e:Exception => Future {
+          val req = ServiceRequest("recommendation","build",params)
+          failure(req,e.getMessage)
+        }
+        
+      }
+      
+      response.onSuccess {
+        
+        case result => {
+          origin ! result
+        }
+      
+      }
+      response.onFailure {
+      
+        case throwable => {    
+          val req = ServiceRequest("recommendation","build",params)
+          origin ! failure(req,throwable.toString)	                  
+        }	      
+      
+      }
+         
     }
+    
+    case msg:BuildFailed => {
+      
+      val uid = msg.params(Names.REQ_UID)
+      
+      val start = new java.util.Date().getTime.toString            
+      log.info(String.format("""[UID: %s] Preference building failed at %s.""",uid,start))
+      
+    }
+    
+    case msg:BuildFinished => {
+      
+      val uid = msg.params(Names.REQ_UID)
+      
+      val start = new java.util.Date().getTime.toString            
+      log.info(String.format("""[UID: %s] Predictive model building finished at %s.""",uid,start))
 
-    req.data.get(Names.REQ_ALGORITHM) match {
+      context.stop(self)
+      
+    }
+     
+    case msg:LearnFailed => {
+      
+      val uid = msg.params(Names.REQ_UID)
+      
+      val start = new java.util.Date().getTime.toString            
+      log.info(String.format("""[UID: %s] Predictive model building failed at %s.""",uid,start))
+      
+    }
+    
+    case msg:LearnFinished => {
+      
+      val uid = msg.params(Names.REQ_UID)
+      
+      val start = new java.util.Date().getTime.toString            
+      log.info(String.format("""[UID: %s] Predictive model building finished at %s.""",uid,start))
+
+      context.stop(self)
+      
+    }
+   
+    case _ => {
+      
+      val origin = sender               
+      val msg = Messages.REQUEST_IS_UNKNOWN()          
+          
+      origin ! failure(null,msg)
+      context.stop(self)
+
+    }
+  
+  }
+ 
+  protected def execute:Future[Any] = {
+
+    val (duration,retries,time) = Configuration.actor      
+    implicit val timeout:Timeout = DurationInt(time).second
+    
+    ask(actor, StartBuild)
+    
+  }
+  
+  protected def validate:Option[String] = {
+
+    val uid = params(Names.REQ_UID)
+    
+    val algorithm = params.get(Names.REQ_ALGORITHM)
+    val rating    = params.get(Names.REQ_RATING)
+    
+    algorithm match {
         
       case None => {
         return Some(Messages.NO_ALGORITHM_PROVIDED(uid))              
       }
         
-      case Some(algorithm) => {
-        if (Algorithms.isAlgorithm(algorithm) == false) {
-          return Some(Messages.ALGORITHM_IS_UNKNOWN(uid,algorithm))    
+      case Some(value) => {
+        if (Algorithms.isAlgorithm(value) == false) {
+          return Some(Messages.ALGORITHM_IS_UNKNOWN(uid,value))    
         }
           
       }
     
     }  
-    
-    req.data.get(Names.REQ_SOURCE) match {
-        
-      case None => {
-        return Some(Messages.NO_SOURCE_PROVIDED(uid))       
-      }
-        
-      case Some(source) => {
-        if (Sources.isSource(source) == false) {
-          return Some(Messages.SOURCE_IS_UNKNOWN(uid,source))    
-        }          
-      }
-        
-    }
 
-    /**
-     * We have to make sure that there is a sink specified, and,
-     * that the respective sink is set to FILE; this ensures that
-     * the ratings are saved as file on a Hadoop file system 
-     */
-    req.data.get(Names.REQ_SINK) match {
+    if (algorithm.get == Algorithms.ASR) return None
+    
+    rating match {
         
       case None => {
-        return Some(Messages.NO_SINK_PROVIDED(uid))       
+        return Some(Messages.NO_RATING_PROVIDED(uid))       
       }
         
-      case Some(sink) => {
-        if (Sinks.isSink(sink) == false) {
-          return Some(Messages.SINK_IS_UNKNOWN(uid,sink))    
+      case Some(value) => {
+        if (Ratings.isRating(value) == false) {
+          return Some(Messages.RATING_IS_UNKNOWN(uid,value))    
         }          
       }
         
@@ -97,6 +184,23 @@ class ModelBuilder(@transient ctx:RequestContext) extends Distributor(ctx) {
     None
   
     
+  }
+
+  protected def actor:ActorRef = {
+
+    val req_params = params   
+    req_params(Names.REQ_ALGORITHM) match {
+      
+      case Algorithms.ALS => context.actorOf(Props(new ALSFlow(ctx,req_params)))   
+      
+      case Algorithms.ASR => context.actorOf(Props(new ASRFlow(ctx,req_params)))   
+      
+      case Algorithms.CAR => context.actorOf(Props(new CARFlow(ctx,req_params)))   
+
+      case _ => null
+      
+    }
+  
   }
 
 }

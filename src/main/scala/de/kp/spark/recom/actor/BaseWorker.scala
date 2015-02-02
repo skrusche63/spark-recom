@@ -41,22 +41,6 @@ abstract class BaseWorker(@transient ctx:RequestContext) extends BaseActor {
       try {
         val Array(task,topic) = req.task.split(":")
         task match {
-      
-          /*
-           * A 'build' requests initiates the build of a recommender model;
-           * this process, except for association rule mining, start with
-           * the generation of implicit user ratings by leveraging the Akka
-           * remote Preference engine.
-           */
-          case "build" => {
-
-            val missing = missingBuildParams(req)
-            sender ! response(req, missing)
-
-            if (missing == false) doBuildRequest(req)      
-            context.stop(self)
-          
-          }
 
           /*
            * A 'predict' request retrieves a rating for a certain dataset
@@ -145,21 +129,7 @@ abstract class BaseWorker(@transient ctx:RequestContext) extends BaseActor {
             context.stop(self)
           
           }
-        
-          /*
-           * This request trains a certain recommender model; it is the
-           * second step of generating a certain recommender model
-           */
-          case "train" => {
-
-            val missing = missingTrainParams(req)
-            sender ! response(req, missing)
-
-            if (missing == false) doTrainRequest(req)     
-            context.stop(self)
-          
-          }
-         
+                
           case _ => {
            
             val msg = Messages.TASK_IS_UNKNOWN(uid,req.task)
@@ -193,13 +163,7 @@ abstract class BaseWorker(@transient ctx:RequestContext) extends BaseActor {
     }
   
   }
-  /**
-   * Methods to support BUILD requests
-   */
-  protected def missingBuildParams(req:ServiceRequest):Boolean = false
-  
-  protected def doBuildRequest(req:ServiceRequest)
-
+ 
   /**
    * Methods to support PREDICT requests
    */
@@ -224,11 +188,5 @@ abstract class BaseWorker(@transient ctx:RequestContext) extends BaseActor {
   protected def doSimilarRequest(req:ServiceRequest):Future[Any]
 
   protected def buildSimilarResponse(request:ServiceRequest, intermediate:ServiceResponse):Any
-  /**
-   * Methods to support TRAIN requests
-   */
-  protected def missingTrainParams(req:ServiceRequest):Boolean = false
-
-  protected def doTrainRequest(req:ServiceRequest)
-
+ 
 }

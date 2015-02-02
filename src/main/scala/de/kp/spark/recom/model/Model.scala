@@ -79,13 +79,21 @@ case class MultiUserRules(items:List[UserRules])
 object Algorithms {
   
   val ALS:String = "ALS"
-  /* Association rule based recommendations */
   val ASR:String = "ASR"
-  /* Context-aware recommendations */
   val CAR:String = "CAR"
 
   private def algorithms = List(ALS,ASR,CAR) 
   def isAlgorithm(algorithm:String):Boolean = algorithms.contains(algorithm)
+  
+}
+
+object Ratings {
+  
+  val EXPLICIT:String = "explicit"
+  val IMPLICIT:String = "implicit"
+
+  private def ratings = List(EXPLICIT,IMPLICIT) 
+  def isRating(rating:String):Boolean = ratings.contains(rating)
   
 }
 

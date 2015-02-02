@@ -36,67 +36,6 @@ class ALSActor(@transient ctx:RequestContext) extends BaseWorker(ctx) {
 
   val sink = new RedisDB(host,port.toInt)
   
-  /**
-   * The user rating is built by delegating the request to the 
-   * remote rating service; this Akka service represents the 
-   * User Preference engine of Predictiveworks.
-   */
-  def doBuildRequest(req:ServiceRequest) {
-      
-    val service = req.service
-    /*
-     * The user specifies the algorithm as 'ALS'; this algorithm is
-     * not known by the user preference engine and must be replaced
-     * by NPREF, i.e. NPREF and ALS are strongly correlated by this
-     * recommend
-     * 
-     * NPREF is an item based preference algorithm that is supported 
-     * by the preference engine
-     */
-    val excludes = List(Names.REQ_ALGORITHM)
-    val data = Map(Names.REQ_ALGORITHM -> "NPREF", Names.REQ_NEXT_ALGORITHM -> "ALS") ++  
-                 req.data.filter(kv => excludes.contains(kv._1) == false)  
-    
-    val message = Serializer.serializeRequest(new ServiceRequest(req.service,req.task,data))
-    /*
-     * Building user rating is a fire-and-forget task
-     * from the recommendation service prespective
-     */
-    ctx.send(service,message)
-    
-  }
- 
-  def doTrainRequest(req:ServiceRequest) {
-    /*
-     * The training request must provide a name for the correlation 
-     * matrix to uniquely distinguish this matrix from all others
-     */
-    val name = if (req.data.contains(Names.REQ_NAME)) req.data(Names.REQ_NAME) 
-      else throw new Exception("No name for factorization model provided.")
-          
-    cache.addStatus(req,ResponseStatus.MODEL_TRAINING_STARTED)
-    /*
-     * Build ALS recommendation model based on the request data;
-     * users & items refer to the reference information that is 
-     * used to map a certain user (uid) and item (iid) to the 
-     * Integer representation required by the ALS algorithm
-     */
-    val model = new ALSRecommender(ctx).train(req)
-          
-    /* Register model */
-    val now = new java.util.Date()
-    val dir = String.format("""%s/matrix/%s/%s""",Configuration.model,name,now.getTime().toString)
-    /*
-     * The ALS model trained is saved on the HDFS file system and
-     * must be load before building any recommendations
-     */
-    HadoopIO.writeRecom(model,dir)
-    
-    sink.addModel(req,dir)          
-    cache.addStatus(req,ResponseStatus.MODEL_TRAINING_FINISHED)
-
- }
-
   def doPredictRequest(req:ServiceRequest):Future[Any] = {
     
     val site  = req.data(Names.REQ_SITE)

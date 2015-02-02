@@ -21,21 +21,19 @@ package de.kp.spark.recom.als
 import akka.actor._
 
 import de.kp.spark.core.Names
+import de.kp.spark.core.model._
 
 import de.kp.spark.recom.RequestContext
 import de.kp.spark.recom.model._
 
 import scala.collection.mutable.Buffer
 /**
- * ALSPipeline controls the data analytics process with respect
+ * ALSFlow controls the data analytics process with respect
  * to build matrix factorization recommendation models; the process
  * comprises a sequence of two steps: a) build preferences,
  * b) build prediction model
  */
-class ALSPipeline(ctx:RequestContext,params:Map[String,String]) extends Actor with ActorLogging {
-  
-  private def STEPS = Buffer.empty[String]
-  private def COUNT = 2
+class ALSFlow(ctx:RequestContext,params:Map[String,String]) extends Actor with ActorLogging {
   
   def receive = {
     
@@ -43,31 +41,31 @@ class ALSPipeline(ctx:RequestContext,params:Map[String,String]) extends Actor wi
       
       try {
         
+        /*
+         * Send response to ModelBuilder (parent)
+         */
+        val res_params = params ++ Map(Names.REQ_MESSAGE -> "ALS model building started.")
+        sender ! ServiceResponse("recommendation","build",res_params,ResponseStatus.BUILDING_STARTED)
+         
         validate
        
         val uid = params(Names.REQ_UID)
         val start = new java.util.Date().getTime.toString            
 
-        log.info(String.format("""[UID: %s] CAR pipeline started at %s.""",uid,start))
+        log.info(String.format("""[UID: %s] ALS pipeline started at %s.""",uid,start))
      
-        /*
-         * The following parameters must be provided by the requestor:
-         * 
-         * - 'site', 'uid', 'name'
-         * 
-         * - 'algorithm' = ALS
-         * - 'rating'    = implicit | explicit
-         * 
-         * The recommender expects implict or explicit rating data 
-         * tracked by a prior data processing task and indexed in
-         * an Elasticsearch cluster
-         * 
-         * - 'source'    = ELASTIC
-         * 
-         * The 'algorithm' value must be replaced by 'NPREF' 
-         * 
-         */
-        val req_params = params ++ Map(Names.REQ_ALGORITHM -> "NPREF", Names.REQ_SOURCE -> "ELASTIC", Names.REQ_SINK -> "PARQUET")
+        val req_params = params ++ Map(
+            Names.REQ_ALGORITHM -> "NPREF", 
+            /*
+             * User events as a basis for preference modeling
+             * are tracked and stored in an Elasticsearch cluster
+             */
+            Names.REQ_SOURCE -> "ELASTIC", 
+            /*
+             * The preference modeler is required to save the
+             * results as parquet file
+             */
+            Names.REQ_SINK -> "PARQUET")
       
         /* Delegate request to ALSPreference actor */
         val builder = context.actorOf(Props(new ALSPreference(ctx,params)))
@@ -77,7 +75,7 @@ class ALSPipeline(ctx:RequestContext,params:Map[String,String]) extends Actor wi
         case e:Exception => {
 
           val res_params = params ++ Map(Names.REQ_MESSAGE -> e.getMessage)
-          context.parent ! LearnFailed(res_params)
+          context.parent ! BuildFailed(res_params)
           
           context.stop(self)
           

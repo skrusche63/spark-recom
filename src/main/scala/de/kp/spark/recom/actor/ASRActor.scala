@@ -39,41 +39,6 @@ import scala.collection.mutable.ArrayBuffer
 class ASRActor(@transient ctx:RequestContext) extends BaseWorker(ctx) {
 
   private val service = "association"    
-  
-    /**
-   * Recommendations based on association rules do not need to
-   * build user preferences first; therefore, the request is
-   * delegated to mining the respective association rules
-   */
-  def doBuildRequest(req:ServiceRequest) {
-
-    /*
-     * The 'algorithm' parameter is specified as 'ASR'; the respective Association
-     * Analysis engine, however, distinguishes between 'TOPK' and 'TOPKNR' algorithms.
-     * 
-     * For recommendation purposes, we use the 'TOPKNR' association rule algorithm.
-     */
-    val data = req.data.map(x => {
-      if (x._1 == Names.REQ_ALGORITHM) (Names.REQ_ALGORITHM,"TOPKNR") else x
-    })
-    
-    doTrainRequest(new ServiceRequest(service,"train",data))
-    
-  }
-  /**
-   * In case of association rule based recommendation models, the 
-   * term 'model' is equivalent to the respective association rules
-   */
-  def doTrainRequest(req:ServiceRequest) {
-      
-    val message = Serializer.serializeRequest(req)
-    /*
-     * Mining association rules is a fire-and-forget task
-     * from the recommendation service prespective
-     */
-    ctx.send(service,message)
-    
-  }
   /**
    * Prediction requests are not supported for association rules
    */

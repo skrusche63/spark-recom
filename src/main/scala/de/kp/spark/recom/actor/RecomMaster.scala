@@ -58,45 +58,14 @@ class RecomMaster(@transient val ctx:RequestContext) extends BaseActor {
 	  val origin = sender	  
 	  try {
 	    
-	    deserializeRequest(message) match {
-	      /*
-           * We try to deserialize the external message as a ServiceRequest;
-           * this is the most frequent use case and will be considered first
-           */
-	      case Some(req) => {
-	      
-	        val response = doRequest(req)
-	        /*
-	         * In this case a response must be sent to the sender as a request
-	         * is always answered
-	         */
-            response.onSuccess {
-              case result => origin ! serialize(result)
-            }
-            response.onFailure {
-              case result => origin ! serialize(failure(req,Messages.GENERAL_ERROR(req.data(Names.REQ_UID))))	      
-	        }
-	      
-	      }
-	    
-	      case None => {
-	        /*
-             * Next we try to deserialize the external message as a ServiceResponse;
-             * the message may be sent by the user preference engine or one of the
-             * engine of Predictiveworks.
-             */
-	        deserializeResponse(message) match {
-	          /*
-	           * In this case no response is sent to the sender as this is a 
-	           * notification to a previously invoked data processing task
-	           */
-	          case Some(res) => doResponse(res)	          
-	          case None => throw new Exception("Unknown message")
-	          
-	        }
-	      
-	      }
-	  
+	    val req = Serializer.deserializeRequest(message)
+        val response = doRequest(req)
+
+        response.onSuccess {
+          case result => origin ! serialize(result)
+        }
+        response.onFailure {
+          case result => origin ! serialize(failure(req,Messages.GENERAL_ERROR(req.data(Names.REQ_UID))))	      
 	    }
 	  
 	  } catch {
@@ -108,23 +77,6 @@ class RecomMaster(@transient val ctx:RequestContext) extends BaseActor {
 	  }
     
     }
-    
-    /**
-     * This request is sent by the REST API
-     */
-    case req:ServiceRequest => {
-	  	    
-	  val origin = sender
-
-	  val response = doRequest(req)
-      response.onSuccess {
-        case result => origin ! result
-      }
-      response.onFailure {
-        case result => origin ! failure(req,Messages.GENERAL_ERROR(req.data(Names.REQ_UID)))	      
-	  }
-      
-    }
   
     case _ => {
  
@@ -135,191 +87,18 @@ class RecomMaster(@transient val ctx:RequestContext) extends BaseActor {
     
   }
 
-  private def deserializeRequest(message:String):Option[ServiceRequest] = {
-    
-    try {
-      
-      Some(Serializer.deserializeRequest(message))
-      
-    } catch {
-      case e:Exception => None
-    
-    }
-    
-  }
-  
-  private def deserializeResponse(message:String):Option[ServiceResponse] = {
-    
-    try {
-      
-      Some(Serializer.deserializeResponse(message))
-      
-    } catch {
-      case e:Exception => None
-    
-    }
-    
-  }
-
   private def doRequest(req:ServiceRequest):Future[Any] = {
-	
-    val task = req.task.split(":")(0)
-    ask(actor(task),req)
-    
-  }
-  /**
-   * This method is responsible for preparing the next task in a
-   * model building pipeline; the recommender actually interacts
-   * with the user preference engine (service: rating) and the
-   * context-aware analysis engine (service: context).
-   */
-  private def doResponse(res:ServiceResponse) {
-    
-    val service = res.service
-    service match {
-
-      case "association" => {
-        /*
-         * The response is sent by the Association Analysis as a notification
-         * to a certain data mining task; in this case no further action has
-         * to be taken
-         */
-      }
-      case "context" => {
-        /*
-         * The response is sent by the Context-Aware analysis engine and 
-         * indicates that the building process of a certain factorization
-         * model or correlation matrix has been finished successfully.
-         * 
-         * We have to determine which training step is referenced, and
-         * in case of a factorization model one must proceed to also train
-         * the correlation matrix. Otherwise no action has to be taken 
-         */
-        val status = res.task
-        if (status == ResponseStatus.MATRIX_TRAINING_FINISHED) {
-          /*
-           * In this case, we have to determine which matrix training request
-           * has been finished; note, that we actually support two different
-           * matrices: a) user similarity matrix and b) item similarity matrix
-           */
-          val matrix = res.data(Names.REQ_MATRIX) 
-          if (matrix == "user") {
-            /*
-             * In this case, we have to build the item similarity matrix as
-             * the final preparation step
-             */  
-            val task = "train:matrix"
-            /*
-             * Retrieve the unique task identifier and the name of the factorization 
-             * model; note, that this name is the one that is known by the requestor 
-             */
-            val uid = res.data(Names.REQ_UID)
-            val name = res.data(Names.REQ_NAME)
-          
-            /*
-             * Determine start and end position of the item block
-             */          
-            val formatter = new CARFormatter(ctx,new ServiceRequest("","",Map(Names.REQ_UID -> uid, Names.REQ_NAME -> name)))
-          
-            val userCount = formatter.userCount
-            val itemCount = formatter.itemCount
-            
-            val start = userCount
-            val end   = start + itemCount - 1
-    
-            val excludes = List(Names.REQ_NAME,Names.REQ_START,Names.REQ_END,Names.REQ_MATRIX)
-            val data = Map(Names.REQ_NAME -> name,Names.REQ_START -> start.toString,Names.REQ_END -> end.toString,Names.REQ_MATRIX -> "item") ++  
-                res.data.filter(kv => excludes.contains(kv._1) == false)  
-          
-            /*
-             * The service is actually not set with here, as the respective
-             * value is determined by the actors that process this request
-             */
-            val req = new ServiceRequest("",task,data)
-            ask(actor("train"),req)
-         
-          }
-          
-        } else if (status == ResponseStatus.MODEL_TRAINING_FINISHED) {
-          /*
-           * In this case the matrix training request for the user similarity
-           * matrix is initiated
-           */
-          val task = "train:matrix"
-          /*
-           * Retrieve the unique task identifier and the name of the factorization 
-           * model; note, that this name is the one that is known by the requestor 
-           */
-          val uid = res.data(Names.REQ_UID)
-          val name = res.data(Names.REQ_NAME)
-          
-          /*
-           * Determine start and end position of the user block
-           */          
-          val formatter = new CARFormatter(ctx,new ServiceRequest("","",Map(Names.REQ_UID -> uid, Names.REQ_NAME -> name)))
-          
-          val start = 0
-          val end   = start + formatter.userCount - 1
-    
-          val excludes = List(Names.REQ_NAME,Names.REQ_START,Names.REQ_END,Names.REQ_MATRIX)
-          val data = Map(Names.REQ_NAME -> name,Names.REQ_START -> start.toString,Names.REQ_END -> end.toString,Names.REQ_MATRIX -> "user") ++  
-                       res.data.filter(kv => excludes.contains(kv._1) == false)  
-          
-          /*
-           * The service is actually not set with here, as the respective
-           * value is determined by the actors that process this request
-           */
-          val req = new ServiceRequest("",task,data)
-          ask(actor("train"),req)
-          
-        }
-        
-      } 
-      case "rating" => {
-        /*
-         * The response is sent by the user preference service and indicates
-         * that the computation of an implicit rating has finished; in this
-         * case the training of the recommendation model (ALS) or factorization
-         * model (CAR) has to be initiated
-         */
-        
-        val status = res.status
-        if (status == ResponseStatus.RATING_BUILDING_FINISHED) {
-
-          val task = "train:model"
-          /*
-           * The algorithm specified for the next task in the pipeline is
-           * either 'ALS' or 'CAR', i.e. in any case we continue with 
-           * factorization based model building
-           */  
-          val algorithm = res.data(Names.REQ_NEXT_ALGORITHM)
-          
-          val excludes = List(Names.REQ_ALGORITHM,Names.REQ_NEXT_ALGORITHM)
-          val data = Map(Names.REQ_ALGORITHM -> algorithm) ++ res.data.filter(kv => excludes.contains(kv._1) == false)  
-          
-          /*
-           * The service is actually not set with here, as the respective
-           * value is determined by the actors that process this request
-           */
-          val req = new ServiceRequest("",task,data)
-          ask(actor("train"),req)
-          
-        }
-        
-      }
-      case _ => 
-        
-    }
-    
-    
+    ask(actor(req),req)
   }
   
-  private def actor(worker:String):ActorRef = {
+  private def actor(req:ServiceRequest):ActorRef = {
     
+    val req_params = req.data
+    
+    val worker = req.task.split(":")(1)    
     worker match {
 
-      case "build" => context.actorOf(Props(new ModelBuilder(ctx)))
-      case "train" => context.actorOf(Props(new Distributor(ctx)))
+      case "build" => context.actorOf(Props(new ModelBuilder(ctx,req_params)))
       /*
        * The subsequent tasks are delegated to the algorithm specific actors;
        * this is done by the Distributor actor

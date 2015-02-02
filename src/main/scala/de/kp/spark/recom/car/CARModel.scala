@@ -31,7 +31,6 @@ import de.kp.spark.recom.model._
 class CARModel(ctx:RequestContext,params:Map[String,String]) extends Actor with ActorLogging {
 
   implicit val ec = context.dispatcher
-  private val config = Configuration
   
   def receive = {
     
@@ -47,7 +46,6 @@ class CARModel(ctx:RequestContext,params:Map[String,String]) extends Actor with 
        * Build service request message to invoke remote Context-Aware Analysis 
        * engine to train a factorization machine model
        */
-      val service = "context"
       val req  = buildRequest
       
       val serialized = Serializer.serializeRequest(req)
@@ -59,7 +57,7 @@ class CARModel(ctx:RequestContext,params:Map[String,String]) extends Actor with 
        * that a certain status has been reached
        */
       val status = ResponseStatus.MODEL_TRAINING_FINISHED
-      val supervisor = context.actorOf(Props(new Supervisor(req,status,config)))
+      val supervisor = context.actorOf(Props(new Supervisor(req,status,ctx.config)))
       
       /*
        * We evaluate the response message from the remote Association Analysis 

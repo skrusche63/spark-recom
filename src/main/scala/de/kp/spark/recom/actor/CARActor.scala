@@ -35,59 +35,6 @@ class CARActor(@transient ctx:RequestContext) extends BaseWorker(ctx) {
   
   private val service = "context"
 
-  /**
-   * The user rating is built by delegating the request to the 
-   * remote rating service; this Akka service represents the 
-   * User Preference engine of Predictiveworks.
-   */
-  def doBuildRequest(req:ServiceRequest) {
-    /*
-     * The user specifies the algorithm as 'CAR'; this algorithm
-     * is not known by the user preference engine and must be replaced
-     * by EPREF, i.e. NPREF and CAR are strongly correlated by this
-     * recommender.
-     * 
-     * EPREF is an event based preference algorithm that is supported by
-     * the preference engine
-     */
-    val excludes = List(Names.REQ_ALGORITHM)
-    val data = Map(Names.REQ_ALGORITHM -> "EPREF", Names.REQ_NEXT_ALGORITHM -> "CAR") ++ 
-                 req.data.filter(kv => excludes.contains(kv._1) == false)  
-    
-    val message = Serializer.serializeRequest(new ServiceRequest(req.service,req.task,data))
-    /*
-     * Building user rating is a fire-and-forget task
-     * from the recommendation service prespective
-     */
-    ctx.send(req.service,message)
-    
-  }
-  /**
-   * In the training of a factorization model is delegated
-   * to the context-aware analysis engine
-   */
-  def doTrainRequest(req:ServiceRequest) {
-    
-    /*
-     * Train requests initiated by the Recommender are actually
-     * restricted to text file or parquet file data sources
-     */
-    val source = req.data(Names.REQ_SOURCE)
-    
-    val sources = List(Sources.FILE,Sources.PARQUET)
-    if (sources.contains(source) == false)
-      throw new Exception("The CAR algorithm actually only supports text & parquet files as data sources.")
-    
-    /*
-     * Training a factorization model or a correlation matrix is a fire-and-forget 
-     * task from the recommendation service prespective; the request task is either
-     * specified as 'train:matrix' or 'train:model'
-     */
-    val message = Serializer.serializeRequest(new ServiceRequest(service,req.task,req.data))
-    ctx.send(service,message)
-    
-  }
-
   def doPredictRequest(req:ServiceRequest):Future[Any] = {
 
     val message = new CARHandler(ctx).buildPredictRequest(req)

@@ -31,7 +31,6 @@ import de.kp.spark.recom.model._
 class CARMatrix(ctx:RequestContext,params:Map[String,String]) extends Actor with ActorLogging {
 
   implicit val ec = context.dispatcher
-  private val config = Configuration
   
   def receive = {
     
@@ -58,7 +57,7 @@ class CARMatrix(ctx:RequestContext,params:Map[String,String]) extends Actor with
        * that a certain status has been reached
        */
       val status = ResponseStatus.MATRIX_TRAINING_FINISHED
-      val supervisor = context.actorOf(Props(new Supervisor(req,status,config)))
+      val supervisor = context.actorOf(Props(new Supervisor(req,status,ctx.config)))
       
       /*
        * We evaluate the response message from the remote Context Analysis 
