@@ -135,90 +135,14 @@ class CARFlow(ctx:RequestContext,params:Map[String,String]) extends Actor with A
     }
     
     case message:LearnFinished => {
-
-      val res_params = message.params
-      
-      val model = res_params(Names.REQ_MODEL)
-      if (model == "model") {
-        
-        /*
-         * The Context-Aware Analysis engine has built the factorization model;
-         * the subsequent step is to compute the similarity matrix to support
-         * similarity requests: 
-         * 
-         * We actually support two different similarity matrices, one for users
-         * and the other one for items; after having finished model building, 
-         * the next step is to build the 'user' similarity matrix
-         */
-        val uid = res_params(Names.REQ_UID)
-        val name = res_params(Names.REQ_NAME)
-          
-        val formatter = new CARFormatter(ctx, ServiceRequest("","",Map(Names.REQ_UID -> uid, Names.REQ_NAME -> name)))          
-        val (start,end) = formatter.getUserBlock
-    
-        val req_params = res_params ++ Map(
-              Names.REQ_START -> start.toString,
-              Names.REQ_END -> end.toString,
-              /*
-               * Inform the matrix modeler to build a similarity
-               * matrix from the user latent feature vectors
-               */
-              Names.REQ_MATRIX -> "user"
-        )  
-      
-        val actor = context.actorOf(Props(new CARMatrix(ctx,req_params)))
-        actor ! StartLearn
-        
-      } else {
-        
-        /*
-         * The Context-Aware Analysis engine has built a similarity matrix;
-         * we have to determine to which matrix the message refers to.
-         */
-          val matrix = res_params(Names.REQ_MATRIX) 
-          if (matrix == "user") {
-            /*
-             * In this case, we have to build the item similarity matrix as
-             * the final preparation step
-             */  
-            /*
-             * Retrieve the unique task identifier and the name of the factorization 
-             * model; note, that this name is the one that is known by the requestor 
-             */
-            val uid = res_params(Names.REQ_UID)
-            val name = res_params(Names.REQ_NAME)
-          
-            val formatter = new CARFormatter(ctx,new ServiceRequest("","",Map(Names.REQ_UID -> uid, Names.REQ_NAME -> name)))
-            val (start,end) = formatter.getItemBlock
-    
-            val req_params = res_params ++ Map(
-                Names.REQ_START -> start.toString,
-                Names.REQ_END -> end.toString,
-                /*
-                 * Inform the matrix modeler to a build a similarity
-                 * matrix from the item latent feature vectors
-                 */
-                Names.REQ_MATRIX -> "item"
-            )  
-      
-            /* Delegate request to CARMatrix actor */
-            val actor = context.actorOf(Props(new CARMatrix(ctx,req_params)))
-            actor ! StartLearn
-         
-          } else {
-            
-            /*
-             * The model and matrix building request is finished;
-             * we stop the data analytics pipeline here and inform 
-             * the requestor about this situation
-             */
-            context.parent ! message
-            context.stop(self)
-          
-          }
-       
-      }
-      
+      /*
+       * The model and matrix building request is finished;
+       * we stop the data analytics pipeline here and inform 
+       * the requestor about this situation
+       */
+      context.parent ! message
+      context.stop(self)
+     
     }
     
   }

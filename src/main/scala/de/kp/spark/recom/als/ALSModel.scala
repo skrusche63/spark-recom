@@ -30,7 +30,7 @@ import de.kp.spark.core.redis.RedisCache
 import de.kp.spark.recom.{Configuration,RequestContext}
 import de.kp.spark.recom.model._
 
-class ALSMatrix(ctx:RequestContext,params:Map[String,String]) extends Actor with ActorLogging {
+class ALSModel(ctx:RequestContext,params:Map[String,String]) extends Actor with ActorLogging {
 
   val (host,port) = Configuration.redis
   val cache = new RedisCache(host,port.toInt)
@@ -48,7 +48,7 @@ class ALSMatrix(ctx:RequestContext,params:Map[String,String]) extends Actor with
         log.info(String.format("""[UID: %s] %s matrix request received at %s.""",uid,name,start))
         
         val req = ServiceRequest("","",params)
-        cache.addStatus(req,ResponseStatus.MATRIX_TRAINING_STARTED)
+        cache.addStatus(req,ResponseStatus.TRAINING_STARTED)
 
         /*
          * Build ALS recommendation model based on the request data;
@@ -57,7 +57,7 @@ class ALSMatrix(ctx:RequestContext,params:Map[String,String]) extends Actor with
          * Integer representation required by the ALS algorithm
          */
         new ALSRecommender(ctx).train(req)
-        cache.addStatus(req,ResponseStatus.MATRIX_TRAINING_FINISHED)
+        cache.addStatus(req,ResponseStatus.TRAINING_FINISHED)
 
         val res_params = params ++ Map(Names.REQ_MODEL -> "matrix")
         context.parent ! LearnFinished(res_params)

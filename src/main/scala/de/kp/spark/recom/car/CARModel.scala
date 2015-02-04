@@ -52,11 +52,11 @@ class CARModel(ctx:RequestContext,params:Map[String,String]) extends Actor with 
       val response = ctx.send(req.service,serialized).mapTo[String]
       
       /*
-       * The RemoteSupervisor actor monitors the Redis cache entries of this
-       * association rule mining request and informs this actor (as parent)
-       * that a certain status has been reached
+       * The Supervisor actor monitors the Redis cache entries of this
+       * factorization machine training request and informs this actor 
+       * (as parent) that a certain status has been reached
        */
-      val status = ResponseStatus.MODEL_TRAINING_FINISHED
+      val status = ResponseStatus.TRAINING_FINISHED
       val supervisor = context.actorOf(Props(new Supervisor(req,status,ctx.config)))
       
       /*

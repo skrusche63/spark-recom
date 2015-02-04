@@ -110,7 +110,7 @@ class ALSFlow(ctx:RequestContext,params:Map[String,String]) extends Actor with A
       val excludes = List(Names.REQ_ALGORITHM,Names.REQ_SINK)
       val req_params = res_params.filter(kv => excludes.contains(kv._1) == false) ++ Map(Names.REQ_SOURCE -> "PARQUET")
       
-      val actor = context.actorOf(Props(new ALSMatrix(ctx,req_params)))
+      val actor = context.actorOf(Props(new ALSModel(ctx,req_params)))
       actor ! StartLearn
         
       
