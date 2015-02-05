@@ -78,6 +78,16 @@ object Configuration extends Serializable with CoreConf {
     
   }
  
+  override def mongo:HConf = {
+   
+    val cfg = config.getConfig("mongo")
+    val conf = new HConf()                          
+
+    conf.set("mongo.input.uri",cfg.getString("mongo.input.uri"))
+    conf
+     
+  }
+ 
   override def mysql:(String,String,String,String) = {
 
    val cfg = config.getConfig("mysql")
