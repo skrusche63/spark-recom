@@ -47,6 +47,17 @@ object Configuration extends Serializable with CoreConf {
     cfg.getInt("size")   
     
   }
+ 
+  override def cassandra:Map[String,String] = {
+   
+    val cfg = config.getConfig("cassandra")
+    val conf = Map(
+      "spark.cassandra.connection.host" -> cfg.getString("spark.cassandra.connection.host")
+    )                          
+
+    conf
+     
+  }
 
   override def elastic:HConf = {
   
